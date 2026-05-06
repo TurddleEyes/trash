@@ -43,6 +43,8 @@
   const els = {
     modeScreen: document.getElementById("modeScreen"),
     gameShell: document.getElementById("gameShell"),
+    modeFullscreen: document.getElementById("modeFullscreen"),
+    fullscreenButton: document.getElementById("fullscreenButton"),
     modeName: document.getElementById("modeName"),
     botGrid: document.getElementById("botGrid"),
     humanGrid: document.getElementById("humanGrid"),
@@ -83,6 +85,81 @@
   let drag = null;
   let suppressClick = false;
   let modalAction = null;
+  let fallbackFullscreen = false;
+
+  function setAppHeight() {
+    const visualHeight = window.visualViewport && window.visualViewport.height;
+    const height = Math.max(320, Math.round(visualHeight || window.innerHeight || document.documentElement.clientHeight));
+    document.documentElement.style.setProperty("--app-height", `${height}px`);
+  }
+
+  function fullscreenElement() {
+    return document.fullscreenElement || document.webkitFullscreenElement || document.msFullscreenElement || null;
+  }
+
+  function syncFullscreenUi() {
+    const active = Boolean(fullscreenElement()) || fallbackFullscreen;
+    document.body.classList.toggle("fullscreen-mode", active);
+
+    if (els.fullscreenButton) {
+      els.fullscreenButton.textContent = active ? "↙" : "⛶";
+      els.fullscreenButton.title = active ? "Exit fullscreen" : "Fullscreen";
+      els.fullscreenButton.setAttribute("aria-label", active ? "Exit fullscreen" : "Fullscreen");
+    }
+
+    if (els.modeFullscreen) {
+      els.modeFullscreen.textContent = active ? "Fullscreen on" : "Open fullscreen";
+    }
+
+    setAppHeight();
+    window.setTimeout(setAppHeight, 90);
+  }
+
+  async function openFullscreen() {
+    fallbackFullscreen = false;
+    setAppHeight();
+    const root = document.documentElement;
+    const request = root.requestFullscreen || root.webkitRequestFullscreen || root.msRequestFullscreen;
+
+    if (request) {
+      try {
+        await request.call(root, { navigationUI: "hide" });
+      } catch (firstError) {
+        try {
+          await request.call(root);
+        } catch (secondError) {
+          fallbackFullscreen = true;
+          if (state) setStatus("Fullscreen was blocked, so the board was fitted to this screen.");
+        }
+      }
+    } else {
+      fallbackFullscreen = true;
+      if (state) setStatus("Fullscreen is not supported here, so the board was fitted to this screen.");
+    }
+
+    syncFullscreenUi();
+  }
+
+  async function closeFullscreen() {
+    fallbackFullscreen = false;
+    const exit = document.exitFullscreen || document.webkitExitFullscreen || document.msExitFullscreen;
+    if (fullscreenElement() && exit) {
+      try {
+        await exit.call(document);
+      } catch (error) {
+        fallbackFullscreen = false;
+      }
+    }
+    syncFullscreenUi();
+  }
+
+  function toggleFullscreen() {
+    if (fullscreenElement() || fallbackFullscreen) {
+      closeFullscreen();
+      return;
+    }
+    openFullscreen();
+  }
 
   function createPlayer(name) {
     return {
@@ -117,6 +194,7 @@
     };
     els.modeScreen.classList.add("hidden");
     els.gameShell.classList.remove("hidden");
+    setAppHeight();
     hideAllModals();
     startRound();
   }
@@ -669,6 +747,7 @@
     hideAllModals();
     els.gameShell.classList.add("hidden");
     els.modeScreen.classList.remove("hidden");
+    setAppHeight();
   }
 
   function useItem(index) {
@@ -1124,6 +1203,8 @@
     button.addEventListener("click", () => startMatch(button.dataset.mode));
   });
 
+  els.modeFullscreen.addEventListener("click", toggleFullscreen);
+  els.fullscreenButton.addEventListener("click", toggleFullscreen);
   els.deckPile.addEventListener("pointerdown", (event) => beginPileDrag(event, "deck"));
   els.discardPile.addEventListener("pointerdown", (event) => beginPileDrag(event, "discard"));
   els.currentCard.querySelector(".mini-card").addEventListener("pointerdown", beginHeldDrag);
@@ -1145,4 +1226,16 @@
     state.shopOffers = [];
     continueToNextRound();
   });
+
+  window.addEventListener("resize", setAppHeight);
+  window.addEventListener("orientationchange", () => window.setTimeout(setAppHeight, 120));
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener("resize", setAppHeight);
+    window.visualViewport.addEventListener("scroll", setAppHeight);
+  }
+  document.addEventListener("fullscreenchange", syncFullscreenUi);
+  document.addEventListener("webkitfullscreenchange", syncFullscreenUi);
+  document.addEventListener("msfullscreenchange", syncFullscreenUi);
+  setAppHeight();
+  syncFullscreenUi();
 }());
