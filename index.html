@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>Trash Cards</title>
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <main class="game-shell">
+      <header class="top-bar">
+        <div class="brand-block">
+          <p class="eyebrow">Trash Cards</p>
+          <h1>A-10 or bust.</h1>
+        </div>
+        <div class="score-strip" aria-label="Round progress">
+          <div>
+            <span>You</span>
+            <strong id="humanProgress">0/10</strong>
+          </div>
+          <div>
+            <span>Bot</span>
+            <strong id="botProgress">0/10</strong>
+          </div>
+        </div>
+        <button id="newGame" class="icon-button" aria-label="New game" title="New game">↻</button>
+      </header>
+
+      <section class="table-surface" aria-live="polite">
+        <section class="table">
+          <article class="player-panel opponent">
+            <div class="player-line">
+              <div>
+                <span>Bot</span>
+                <small id="botTurnText">Waiting</small>
+              </div>
+              <div class="progress-track"><span id="botTrack"></span></div>
+            </div>
+            <div id="botGrid" class="card-grid" aria-label="Bot cards"></div>
+          </article>
+
+          <section class="center-play">
+            <div id="turnPill" class="turn-pill">Your turn</div>
+            <p id="statusText" class="table-status">Draw a card, then drag it to a slot or discard.</p>
+            <div class="piles-row">
+              <button id="deckPile" class="pile deck-pile" type="button" data-drag-source="deck">
+                <span class="pile-label">Deck</span>
+                <span id="deckCount" class="pile-count">0</span>
+              </button>
+              <button id="discardPile" class="pile discard-pile" type="button" data-drag-target="discard" data-drag-source="discard">
+                <span class="pile-label">Discard</span>
+                <span id="discardCard" class="mini-card"></span>
+              </button>
+            </div>
+            <div id="currentCard" class="current-card empty">
+              <span class="pile-label">Current card</span>
+              <span class="mini-card" data-drag-source="held"></span>
+            </div>
+          </section>
+
+          <article class="player-panel human">
+            <div class="player-line">
+              <div>
+                <span>You</span>
+                <small id="humanTurnText">Draw</small>
+              </div>
+              <div class="progress-track"><span id="humanTrack"></span></div>
+            </div>
+            <div id="humanGrid" class="card-grid playable-grid" aria-label="Your cards"></div>
+          </article>
+        </section>
+      </section>
+    </main>
+
+    <div id="roundModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="roundTitle">
+      <div class="modal-card">
+        <p class="eyebrow">Round over</p>
+        <h2 id="roundTitle">You won.</h2>
+        <p id="roundSummary"></p>
+        <button id="playAgain" type="button">Play again</button>
+      </div>
+    </div>
+
+    <script src="game.js"></script>
+  </body>
+</html>
