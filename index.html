@@ -4,6 +4,60 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <title>Trash Cards</title>
+    <style>
+      .game-shell.hidden,
+      .screen-overlay.hidden {
+        display: none !important;
+      }
+
+      .screen-overlay {
+        position: fixed !important;
+        inset: 0 !important;
+        z-index: 80 !important;
+        min-height: 100vh !important;
+        display: grid !important;
+        place-items: center !important;
+        padding: 22px !important;
+        background: linear-gradient(145deg, #081817, #11252a 52%, #211c1c) !important;
+      }
+
+      .mode-wrap {
+        width: min(760px, 100%) !important;
+      }
+
+      .mode-grid {
+        display: grid !important;
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+        gap: 12px !important;
+      }
+
+      .mode-card {
+        min-height: 160px !important;
+        padding: 18px !important;
+        border: 1px solid rgba(255, 255, 255, 0.16) !important;
+        border-radius: 8px !important;
+        display: grid !important;
+        align-content: end !important;
+        gap: 8px !important;
+        background: rgba(255, 255, 255, 0.09) !important;
+        color: #f7f1e7 !important;
+        text-align: left !important;
+      }
+
+      .mode-card.featured {
+        border-color: rgba(237, 189, 88, 0.55) !important;
+      }
+
+      @media (max-width: 620px) {
+        .mode-grid {
+          grid-template-columns: 1fr !important;
+        }
+
+        .mode-card {
+          min-height: 128px !important;
+        }
+      }
+    </style>
     <link rel="stylesheet" href="styles.css">
   </head>
   <body>
@@ -24,7 +78,7 @@
       </div>
     </section>
 
-    <main class="game-shell">
+    <main id="gameShell" class="game-shell hidden">
       <header class="top-bar">
         <div class="brand-block">
           <p id="modeName" class="eyebrow">Trash Cards</p>
