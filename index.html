@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>Trash Cards</title>
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <section id="modeScreen" class="screen-overlay mode-select" aria-labelledby="modeTitle">
+      <div class="mode-wrap">
+        <p class="eyebrow">Trash Cards</p>
+        <h1 id="modeTitle">Choose your table.</h1>
+        <div class="mode-grid">
+          <button class="mode-card" type="button" data-mode="classic">
+            <span>Trash</span>
+            <strong>Classic race from 10 cards down to 1.</strong>
+          </button>
+          <button class="mode-card featured" type="button" data-mode="crown">
+            <span>Trash: Crown Debt</span>
+            <strong>Rounds, coins, shop items, and one brutal comeback item.</strong>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <main class="game-shell">
+      <header class="top-bar">
+        <div class="brand-block">
+          <p id="modeName" class="eyebrow">Trash Cards</p>
+          <h1>A-10 or bust.</h1>
+        </div>
+        <div class="score-strip" aria-label="Round progress">
+          <div>
+            <span>You</span>
+            <strong id="humanProgress">0/10</strong>
+            <small id="humanNeed">Need 10</small>
+          </div>
+          <div>
+            <span>Bot</span>
+            <strong id="botProgress">0/10</strong>
+            <small id="botNeed">Need 10</small>
+          </div>
+        </div>
+        <button id="newGame" class="icon-button" aria-label="New game" title="New game">↻</button>
+      </header>
+
+      <section class="table-surface" aria-live="polite">
+        <section class="table">
+          <article class="player-panel opponent">
+            <div class="player-line">
+              <div>
+                <span>Bot</span>
+                <small id="botTurnText">Waiting</small>
+              </div>
+              <div class="progress-track"><span id="botTrack"></span></div>
+            </div>
+            <div id="botGrid" class="card-grid" aria-label="Bot cards"></div>
+          </article>
+
+          <section class="center-play">
+            <div id="turnPill" class="turn-pill">Your turn</div>
+            <p id="statusText" class="table-status">Draw a card, then drag it to a slot or discard.</p>
+            <div class="piles-row">
+              <button id="deckPile" class="pile deck-pile" type="button" data-drag-source="deck">
+                <span class="pile-label">Deck</span>
+                <span id="deckCount" class="pile-count">0</span>
+              </button>
+              <button id="discardPile" class="pile discard-pile" type="button" data-drag-target="discard" data-drag-source="discard">
+                <span class="pile-label">Discard</span>
+                <span id="discardCard" class="mini-card"></span>
+              </button>
+            </div>
+            <div id="currentCard" class="current-card empty">
+              <span class="pile-label">Current card</span>
+              <span class="mini-card" data-drag-source="held"></span>
+            </div>
+            <div id="inventoryBar" class="inventory-bar" aria-label="Your items"></div>
+          </section>
+
+          <article class="player-panel human">
+            <div class="player-line">
+              <div>
+                <span>You</span>
+                <small id="humanTurnText">Draw</small>
+              </div>
+              <div class="progress-track"><span id="humanTrack"></span></div>
+            </div>
+            <div id="humanGrid" class="card-grid playable-grid" aria-label="Your cards"></div>
+          </article>
+        </section>
+      </section>
+    </main>
+
+    <div id="roundModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="roundTitle">
+      <div class="modal-card">
+        <p class="eyebrow">Round over</p>
+        <h2 id="roundTitle">You won.</h2>
+        <p id="roundSummary"></p>
+        <div id="roundRewards" class="reward-list"></div>
+        <button id="playAgain" type="button">Continue</button>
+      </div>
+    </div>
+
+    <div id="discardModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="discardTitle">
+      <div class="modal-card">
+        <p class="eyebrow">Winner tax</p>
+        <h2 id="discardTitle">Discard one item.</h2>
+        <p>You won while holding two items. Pick one to throw away before the shop opens.</p>
+        <div id="discardChoices" class="item-grid"></div>
+      </div>
+    </div>
+
+    <div id="shopModal" class="modal hidden shop-modal" role="dialog" aria-modal="true" aria-labelledby="shopTitle">
+      <div class="modal-card wide-card">
+        <p class="eyebrow">Between rounds</p>
+        <h2 id="shopTitle">Shop</h2>
+        <p id="shopStatus">Buy up to two held items, use Debt of the Crown, or skip ahead.</p>
+        <div class="shop-meta">
+          <span id="coinText">Coins: 0</span>
+          <span id="roundText">Round 1</span>
+        </div>
+        <h3>Your items</h3>
+        <div id="shopInventory" class="item-grid"></div>
+        <h3>Offers</h3>
+        <div id="shopOffers" class="item-grid"></div>
+        <button id="nextRound" type="button">Next round</button>
+      </div>
+    </div>
+
+    <script src="game.js"></script>
+  </body>
+</html>
