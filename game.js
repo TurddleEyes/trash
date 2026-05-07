@@ -39,6 +39,7 @@
   };
 
   const shopPool = ["peek", "peek", "secondDraw", "burn", "burn", "swap", "wild", "debt"];
+  const MUSIC_FOLDER = "assets/audio/music/";
   const AUDIO_FILES = {
     music: "assets/audio/lofi-loop.mp3",
     draw: "assets/audio/card-draw.mp3",
@@ -109,6 +110,9 @@
   const audioState = {
     enabled: false,
     initialized: false,
+    musicTracks: [],
+    currentMusicSrc: "",
+    failedMusicTracks: new Set(),
     music: null,
     sfx: {}
   };
@@ -155,9 +159,23 @@
     return audio;
   }
 
+  function normalizeMusicTrack(src) {
+    const track = src.trim();
+    if (/^(https?:)?\/\//.test(track) || track.startsWith("/") || track.startsWith("assets/")) return track;
+    return `${MUSIC_FOLDER}${track}`;
+  }
+
+  function configuredMusicTracks() {
+    const playlist = Array.isArray(window.TRASH_MUSIC_PLAYLIST) ? window.TRASH_MUSIC_PLAYLIST : [];
+    const tracks = playlist
+      .filter((track) => typeof track === "string" && track.trim())
+      .map(normalizeMusicTrack);
+    return tracks.length ? tracks : [AUDIO_FILES.music];
+  }
+
   function initAudio() {
     if (audioState.initialized || typeof Audio === "undefined") return;
-    audioState.music = makeAudio(AUDIO_FILES.music, true, AUDIO_VOLUMES.music);
+    audioState.musicTracks = configuredMusicTracks();
     Object.keys(AUDIO_FILES).forEach((key) => {
       if (key === "music") return;
       audioState.sfx[key] = makeAudio(AUDIO_FILES[key], false, AUDIO_VOLUMES[key]);
@@ -180,11 +198,52 @@
     els.audioButton.setAttribute("aria-label", audioState.enabled ? "Audio on" : "Audio off");
   }
 
+  function chooseMusicTrack() {
+    const available = audioState.musicTracks.filter((track) => !audioState.failedMusicTracks.has(track));
+    if (!available.length) return "";
+    if (available.length === 1) return available[0];
+
+    const choices = available.filter((track) => track !== audioState.currentMusicSrc);
+    return choices[Math.floor(Math.random() * choices.length)];
+  }
+
+  function stopMusicTrack() {
+    if (!audioState.music) return;
+    audioState.music.pause();
+    audioState.music = null;
+  }
+
+  function startMusicTrack(src) {
+    if (!src) return;
+    stopMusicTrack();
+    audioState.currentMusicSrc = src;
+    const trackAudio = makeAudio(src, false, AUDIO_VOLUMES.music);
+    audioState.music = trackAudio;
+    trackAudio.addEventListener("ended", () => {
+      if (audioState.music === trackAudio) playNextMusic();
+    });
+    trackAudio.addEventListener("error", () => {
+      if (audioState.music !== trackAudio) return;
+      audioState.failedMusicTracks.add(src);
+      playNextMusic();
+    });
+    trackAudio.play().catch(() => {});
+  }
+
+  function playNextMusic() {
+    if (!audioState.enabled) return;
+    initAudio();
+    startMusicTrack(chooseMusicTrack());
+  }
+
   function playMusic() {
     if (!audioState.enabled) return;
     initAudio();
-    if (!audioState.music) return;
-    audioState.music.play().catch(() => {});
+    if (audioState.music) {
+      audioState.music.play().catch(() => {});
+      return;
+    }
+    playNextMusic();
   }
 
   function pauseMusic() {
