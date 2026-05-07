@@ -1,6 +1,10 @@
 window.TRASH_MUSIC_PLAYLIST = [
-  // Put your music files in this folder, then list them here.
-  // "lofi-1.mp3",
-  // "lofi-2.mp3",
-  // "lofi-3.mp3"
+  "A Longing.mp3",
+  "How I Long.mp3",
+  "Memories.mp3",
+  "My Song Title.mp3",
+  "Nostalgia.mp3",
+  "Out of Time.mp3",
+  "Sad Forever.mp3",
+  "When It Was Good (Lofi Memory Lane).mp3"
 ];

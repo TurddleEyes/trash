@@ -42,10 +42,10 @@
   const MUSIC_FOLDER = "assets/audio/music/";
   const AUDIO_FILES = {
     music: "assets/audio/lofi-loop.mp3",
-    draw: "assets/audio/card-draw.mp3",
-    place: "assets/audio/card-place.mp3",
-    discard: "assets/audio/card-discard.mp3",
-    shop: "assets/audio/shop-open.mp3",
+    draw: "assets/audio/SFX/Playing Card Being Layed.mp3",
+    place: "assets/audio/SFX/Playing Card Being Layed.mp3",
+    discard: "assets/audio/SFX/Playing Card Being Layed.mp3",
+    shop: "assets/audio/SFX/Cash Drawer Opening.mp3",
     round: "assets/audio/round-win.mp3"
   };
   const AUDIO_VOLUMES = {

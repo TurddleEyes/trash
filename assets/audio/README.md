@@ -16,12 +16,10 @@ The game picks a random listed song when music starts, then picks another random
 
 ## Sound Effects
 
-Drop sound effects in this folder with these names:
+Current sound effects are stored in `assets/audio/SFX/`:
 
-- `card-draw.mp3` - draw from deck or discard
-- `card-place.mp3` - place a card into a slot
-- `card-discard.mp3` - throw a card into discard
-- `shop-open.mp3` - shop opens between rounds
+- `Playing Card Being Layed.mp3` - card draw, place, and discard
+- `Cash Drawer Opening.mp3` - shop opens between rounds
 - `round-win.mp3` - round or match result opens
 
 Browsers require a player tap before audio can start, so use the music-note button in the game header to turn sound on.
