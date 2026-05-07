@@ -55,9 +55,6 @@
     humanCoins: document.getElementById("humanCoins"),
     botCoinPop: document.getElementById("botCoinPop"),
     humanCoinPop: document.getElementById("humanCoinPop"),
-    roundHud: document.getElementById("roundHud"),
-    botNeed: document.getElementById("botNeed"),
-    humanNeed: document.getElementById("humanNeed"),
     botTrack: document.getElementById("botTrack"),
     humanTrack: document.getElementById("humanTrack"),
     botTurnText: document.getElementById("botTurnText"),
@@ -330,7 +327,6 @@
     if (!state) return;
     els.humanCoins.textContent = state.players[human].coins;
     els.botCoins.textContent = state.players[bot].coins;
-    els.roundHud.textContent = state.round;
   }
 
   function awardMoveCoins(playerIndex, amount, reason) {
@@ -1258,8 +1254,6 @@
     const humanUp = state.players[human].slots.filter((slot) => slot.up).length;
     const botUp = state.players[bot].slots.filter((slot) => slot.up).length;
     renderCoinHud();
-    els.humanNeed.textContent = `Need ${state.players[human].targetSize}`;
-    els.botNeed.textContent = `Need ${state.players[bot].targetSize}`;
     els.humanTrack.style.width = `${(humanUp / state.players[human].slots.length) * 100}%`;
     els.botTrack.style.width = `${(botUp / state.players[bot].slots.length) * 100}%`;
     els.turnPill.textContent = state.turn === human && state.phase !== "waiting" ? "Your turn" : "Bot turn";
