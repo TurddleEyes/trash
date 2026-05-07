@@ -46,7 +46,7 @@
     place: "assets/audio/SFX/Playing Card Being Layed.mp3",
     discard: "assets/audio/SFX/Playing Card Being Layed.mp3",
     shop: "assets/audio/SFX/Cash Drawer Opening.mp3",
-    round: "assets/audio/round-win.mp3"
+    round: ""
   };
   const AUDIO_VOLUMES = {
     music: 0.28,
@@ -177,7 +177,7 @@
     if (audioState.initialized || typeof Audio === "undefined") return;
     audioState.musicTracks = configuredMusicTracks();
     Object.keys(AUDIO_FILES).forEach((key) => {
-      if (key === "music") return;
+      if (key === "music" || !AUDIO_FILES[key]) return;
       audioState.sfx[key] = makeAudio(AUDIO_FILES[key], false, AUDIO_VOLUMES[key]);
     });
     audioState.initialized = true;

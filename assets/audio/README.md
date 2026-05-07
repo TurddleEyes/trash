@@ -20,6 +20,7 @@ Current sound effects are stored in `assets/audio/SFX/`:
 
 - `Playing Card Being Layed.mp3` - card draw, place, and discard
 - `Cash Drawer Opening.mp3` - shop opens between rounds
-- `round-win.mp3` - round or match result opens
+
+If you add a dedicated round-win sound later, place it in `assets/audio/SFX/` and wire that filename into `AUDIO_FILES.round` in `game.js`.
 
 Browsers require a player tap before audio can start, so use the music-note button in the game header to turn sound on.
