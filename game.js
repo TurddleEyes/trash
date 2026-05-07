@@ -689,29 +689,44 @@
 
   function emptyItemCard(text) {
     const div = document.createElement("div");
-    div.className = "item-card";
+    div.className = "item-card empty";
     div.innerHTML = `<p>${text}</p>`;
     return div;
   }
 
+  function itemClass(itemId) {
+    return itemId.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`);
+  }
+
   function itemCard(itemId, actions, legacyHandler = null) {
     const item = ITEMS[itemId];
+    const itemClassName = itemClass(itemId);
     const card = document.createElement("div");
-    card.className = `item-card${item.legendary ? " legendary" : ""}`;
+    card.className = `item-card item-${itemClassName}${item.legendary ? " legendary" : ""}`;
+    const icon = document.createElement("span");
+    icon.className = `item-icon item-icon-${itemClassName}`;
+    icon.setAttribute("aria-hidden", "true");
     const title = document.createElement("strong");
+    title.className = "item-title";
     title.textContent = item.name;
     const cost = document.createElement("span");
+    cost.className = "item-cost";
     cost.textContent = item.legendary ? `${item.cost} coins · Legendary` : `${item.cost} coins`;
     const text = document.createElement("p");
+    text.className = "item-text";
     text.textContent = item.text;
-    card.append(title, cost, text);
+    card.append(icon, title, cost, text);
+
+    const actionWrap = document.createElement("div");
+    actionWrap.className = "item-actions";
 
     if (typeof actions === "string") {
       const button = document.createElement("button");
       button.textContent = actions;
       button.className = "primary";
       button.addEventListener("click", legacyHandler);
-      card.appendChild(button);
+      actionWrap.appendChild(button);
+      card.appendChild(actionWrap);
       return card;
     }
 
@@ -721,8 +736,9 @@
       if (action.primary) button.classList.add("primary");
       button.disabled = Boolean(action.disabled);
       button.addEventListener("click", action.handler);
-      card.appendChild(button);
+      actionWrap.appendChild(button);
     });
+    card.appendChild(actionWrap);
     return card;
   }
 
