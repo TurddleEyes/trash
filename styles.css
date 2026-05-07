@@ -665,6 +665,7 @@ button {
 .modal {
   position: fixed;
   inset: 0;
+  z-index: 120;
   background: rgba(4, 9, 10, 0.74);
   display: grid;
   place-items: center;
