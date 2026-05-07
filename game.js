@@ -46,7 +46,7 @@
     place: "assets/audio/SFX/Playing Card Being Layed.mp3",
     discard: "assets/audio/SFX/Playing Card Being Layed.mp3",
     shop: "assets/audio/SFX/Cash Drawer Opening.mp3",
-    round: ""
+    victory: "assets/audio/SFX/Casino Style Victory  Sound.mp3"
   };
   const AUDIO_VOLUMES = {
     music: 0.28,
@@ -54,7 +54,7 @@
     place: 0.48,
     discard: 0.5,
     shop: 0.45,
-    round: 0.52
+    victory: 0.58
   };
 
   const els = {
@@ -688,7 +688,8 @@
         `${winnerName} cleared the final 1-card board.`,
         rewards,
         "Choose mode",
-        () => showModeSelect()
+        () => showModeSelect(),
+        "victory"
       );
       return;
     }
@@ -750,7 +751,7 @@
     return lines;
   }
 
-  function showRoundModal(title, summary, rewards, buttonText, action) {
+  function showRoundModal(title, summary, rewards, buttonText, action, sfxName = "") {
     modalAction = action;
     els.roundTitle.textContent = title;
     els.roundSummary.textContent = summary;
@@ -762,7 +763,7 @@
     }));
     hideAllModals();
     els.roundModal.classList.remove("hidden");
-    playSfx("round");
+    if (sfxName) playSfx(sfxName);
   }
 
   function showForcedDiscard() {
