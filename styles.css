@@ -299,6 +299,40 @@ button {
   font-size: 1.28rem;
 }
 
+.audio-button {
+  position: relative;
+  color: var(--muted);
+}
+
+.audio-button span {
+  position: relative;
+  top: -1px;
+}
+
+.audio-button::after {
+  content: "";
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  top: 50%;
+  height: 2px;
+  border-radius: 999px;
+  background: currentColor;
+  transform: rotate(-42deg);
+  transform-origin: center;
+  opacity: 0.9;
+}
+
+.audio-button.audio-on {
+  border-color: rgba(237, 189, 88, 0.58);
+  color: var(--gold);
+  background: rgba(237, 189, 88, 0.14);
+}
+
+.audio-button.audio-on::after {
+  opacity: 0;
+}
+
 .icon-button:hover,
 .pile:not(:disabled):hover {
   transform: translateY(-1px);

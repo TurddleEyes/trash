@@ -39,10 +39,27 @@
   };
 
   const shopPool = ["peek", "peek", "secondDraw", "burn", "burn", "swap", "wild", "debt"];
+  const AUDIO_FILES = {
+    music: "assets/audio/lofi-loop.mp3",
+    draw: "assets/audio/card-draw.mp3",
+    place: "assets/audio/card-place.mp3",
+    discard: "assets/audio/card-discard.mp3",
+    shop: "assets/audio/shop-open.mp3",
+    round: "assets/audio/round-win.mp3"
+  };
+  const AUDIO_VOLUMES = {
+    music: 0.28,
+    draw: 0.5,
+    place: 0.48,
+    discard: 0.5,
+    shop: 0.45,
+    round: 0.52
+  };
 
   const els = {
     modeScreen: document.getElementById("modeScreen"),
     gameShell: document.getElementById("gameShell"),
+    audioButton: document.getElementById("audioButton"),
     modeFullscreen: document.getElementById("modeFullscreen"),
     fullscreenButton: document.getElementById("fullscreenButton"),
     helpButton: document.getElementById("helpButton"),
@@ -89,6 +106,18 @@
   let suppressClick = false;
   let modalAction = null;
   let fallbackFullscreen = false;
+  const audioState = {
+    enabled: false,
+    initialized: false,
+    music: null,
+    sfx: {}
+  };
+
+  try {
+    audioState.enabled = localStorage.getItem("trashCardsAudio") === "on";
+  } catch (error) {
+    audioState.enabled = false;
+  }
 
   function setAppHeight() {
     const visualHeight = window.visualViewport && window.visualViewport.height;
@@ -116,6 +145,71 @@
 
   function fullscreenElement() {
     return document.fullscreenElement || document.webkitFullscreenElement || document.msFullscreenElement || null;
+  }
+
+  function makeAudio(src, loop = false, volume = 0.5) {
+    const audio = new Audio(src);
+    audio.preload = "auto";
+    audio.loop = loop;
+    audio.volume = volume;
+    return audio;
+  }
+
+  function initAudio() {
+    if (audioState.initialized || typeof Audio === "undefined") return;
+    audioState.music = makeAudio(AUDIO_FILES.music, true, AUDIO_VOLUMES.music);
+    Object.keys(AUDIO_FILES).forEach((key) => {
+      if (key === "music") return;
+      audioState.sfx[key] = makeAudio(AUDIO_FILES[key], false, AUDIO_VOLUMES[key]);
+    });
+    audioState.initialized = true;
+  }
+
+  function saveAudioPreference() {
+    try {
+      localStorage.setItem("trashCardsAudio", audioState.enabled ? "on" : "off");
+    } catch (error) {
+      // Audio still works without saved preferences.
+    }
+  }
+
+  function syncAudioUi() {
+    if (!els.audioButton) return;
+    els.audioButton.classList.toggle("audio-on", audioState.enabled);
+    els.audioButton.title = audioState.enabled ? "Audio on" : "Audio off";
+    els.audioButton.setAttribute("aria-label", audioState.enabled ? "Audio on" : "Audio off");
+  }
+
+  function playMusic() {
+    if (!audioState.enabled) return;
+    initAudio();
+    if (!audioState.music) return;
+    audioState.music.play().catch(() => {});
+  }
+
+  function pauseMusic() {
+    if (audioState.music) audioState.music.pause();
+  }
+
+  function toggleAudio() {
+    audioState.enabled = !audioState.enabled;
+    saveAudioPreference();
+    syncAudioUi();
+    if (audioState.enabled) {
+      playMusic();
+    } else {
+      pauseMusic();
+    }
+  }
+
+  function playSfx(name) {
+    if (!audioState.enabled) return;
+    initAudio();
+    const base = audioState.sfx[name];
+    if (!base) return;
+    const clip = base.cloneNode(true);
+    clip.volume = base.volume;
+    clip.play().catch(() => {});
   }
 
   function syncFullscreenUi() {
@@ -217,6 +311,7 @@
     els.gameShell.classList.remove("hidden");
     setAppHeight();
     hideAllModals();
+    playMusic();
     startRound();
   }
 
@@ -373,6 +468,7 @@
     afterDraw(playerIndex, false);
     render();
     animateCard(drawn, sourceRect, currentRect(), "draw");
+    playSfx("draw");
   }
 
   function afterDraw(playerIndex, shouldRender = true) {
@@ -421,6 +517,7 @@
     render();
     animateCard(placed, sourceRect, targetRect, "place");
     bumpElement(els.currentCard);
+    playSfx("place");
   }
 
   function trashHeld() {
@@ -442,6 +539,7 @@
     if (trashed.value > 10) awardMoveCoins(playerIndex, 1, "face trash");
     animateCard(trashed, sourceRect, targetRect, "trash");
     bumpElement(els.discardPile);
+    playSfx("discard");
   }
 
   function runBotTurn() {
@@ -605,6 +703,7 @@
     }));
     hideAllModals();
     els.roundModal.classList.remove("hidden");
+    playSfx("round");
   }
 
   function showForcedDiscard() {
@@ -626,6 +725,7 @@
     els.shopStatus.textContent = message || "Buy, replace, use Debt of the Crown, or skip ahead.";
     renderShop();
     render();
+    playSfx("shop");
   }
 
   function generateShopOffers() {
@@ -1286,6 +1386,7 @@
 
   els.modeFullscreen.addEventListener("click", toggleFullscreen);
   els.fullscreenButton.addEventListener("click", toggleFullscreen);
+  els.audioButton.addEventListener("click", toggleAudio);
   els.helpButton.addEventListener("click", showHelp);
   els.closeHelp.addEventListener("click", () => els.helpModal.classList.add("hidden"));
   els.deckPile.addEventListener("pointerdown", (event) => beginPileDrag(event, "deck"));
@@ -1324,5 +1425,6 @@
   document.addEventListener("webkitfullscreenchange", syncFullscreenUi);
   document.addEventListener("msfullscreenchange", syncFullscreenUi);
   setAppHeight();
+  syncAudioUi();
   syncFullscreenUi();
 }());
