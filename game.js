@@ -45,11 +45,17 @@
     gameShell: document.getElementById("gameShell"),
     modeFullscreen: document.getElementById("modeFullscreen"),
     fullscreenButton: document.getElementById("fullscreenButton"),
+    helpButton: document.getElementById("helpButton"),
+    helpModal: document.getElementById("helpModal"),
+    closeHelp: document.getElementById("closeHelp"),
     modeName: document.getElementById("modeName"),
     botGrid: document.getElementById("botGrid"),
     humanGrid: document.getElementById("humanGrid"),
-    botProgress: document.getElementById("botProgress"),
-    humanProgress: document.getElementById("humanProgress"),
+    botCoins: document.getElementById("botCoins"),
+    humanCoins: document.getElementById("humanCoins"),
+    botCoinPop: document.getElementById("botCoinPop"),
+    humanCoinPop: document.getElementById("humanCoinPop"),
+    roundHud: document.getElementById("roundHud"),
     botNeed: document.getElementById("botNeed"),
     humanNeed: document.getElementById("humanNeed"),
     botTrack: document.getElementById("botTrack"),
@@ -89,8 +95,26 @@
 
   function setAppHeight() {
     const visualHeight = window.visualViewport && window.visualViewport.height;
-    const height = Math.max(320, Math.round(visualHeight || window.innerHeight || document.documentElement.clientHeight));
+    const visualWidth = window.visualViewport && window.visualViewport.width;
+    const height = Math.max(1, Math.round(visualHeight || window.innerHeight || document.documentElement.clientHeight));
+    const width = Math.max(1, Math.round(visualWidth || window.innerWidth || document.documentElement.clientWidth));
+    const landscape = width >= height;
+    const stageAspect = landscape ? 16 / 9 : 9 / 16;
+    let stageWidth = width;
+    let stageHeight = height;
+
+    if (stageWidth / stageHeight > stageAspect) {
+      stageWidth = Math.floor(stageHeight * stageAspect);
+    } else {
+      stageHeight = Math.floor(stageWidth / stageAspect);
+    }
+
+    document.documentElement.style.setProperty("--app-width", `${width}px`);
     document.documentElement.style.setProperty("--app-height", `${height}px`);
+    document.documentElement.style.setProperty("--stage-width", `${stageWidth}px`);
+    document.documentElement.style.setProperty("--stage-height", `${stageHeight}px`);
+    document.body.classList.toggle("stage-landscape", landscape);
+    document.body.classList.toggle("stage-portrait", !landscape);
   }
 
   function fullscreenElement() {
@@ -274,6 +298,10 @@
     return state && state.mode === "crown";
   }
 
+  function gameTitle() {
+    return state && state.mode === "crown" ? "Trash: Crown Debt" : "Trash Cards";
+  }
+
   function isPlayable(card, playerIndex) {
     if (!card || card.value < 1) return false;
     const slots = state.players[playerIndex].slots;
@@ -287,6 +315,47 @@
 
   function setStatus(text) {
     els.statusText.textContent = text;
+  }
+
+  function showCoinPop(playerIndex, amount, reason) {
+    const target = playerIndex === human ? els.humanCoinPop : els.botCoinPop;
+    if (!target || amount <= 0) return;
+    target.textContent = `+${amount} ${reason}`;
+    target.classList.remove("show");
+    void target.offsetWidth;
+    target.classList.add("show");
+  }
+
+  function renderCoinHud() {
+    if (!state) return;
+    els.humanCoins.textContent = state.players[human].coins;
+    els.botCoins.textContent = state.players[bot].coins;
+    els.roundHud.textContent = state.round;
+  }
+
+  function awardMoveCoins(playerIndex, amount, reason) {
+    if (!isCrownMode() || amount <= 0) return;
+    state.players[playerIndex].coins += amount;
+    renderCoinHud();
+    showCoinPop(playerIndex, amount, reason);
+  }
+
+  function placementReward(playerIndex) {
+    if (!isCrownMode()) return;
+    let amount = 1;
+    const parts = ["place"];
+    if (state.drawSource === "discard" && state.turnPlacements === 1) {
+      amount += 1;
+      parts.push("discard");
+    }
+    if (state.turnPlacements === 3) {
+      amount += 2;
+      parts.push("chain");
+    } else if (state.turnPlacements > 3) {
+      amount += 1;
+      parts.push("chain");
+    }
+    awardMoveCoins(playerIndex, amount, parts.join(" + "));
   }
 
   function drawFromDeck() {
@@ -342,6 +411,7 @@
     }
     state.turnPlacements += 1;
     state.players[playerIndex].maxChain = Math.max(state.players[playerIndex].maxChain, state.turnPlacements);
+    placementReward(playerIndex);
 
     if (checkWinner(playerIndex)) return endRound(playerIndex);
 
@@ -373,6 +443,7 @@
     state.discard.push(trashed);
     state.held = null;
     state.drawSource = null;
+    if (trashed.value > 10) awardMoveCoins(playerIndex, 1, "face trash");
     animateCard(trashed, sourceRect, targetRect, "trash");
     bumpElement(els.discardPile);
   }
@@ -738,9 +809,14 @@
   }
 
   function hideAllModals() {
+    els.helpModal.classList.add("hidden");
     els.roundModal.classList.add("hidden");
     els.discardModal.classList.add("hidden");
     els.shopModal.classList.add("hidden");
+  }
+
+  function showHelp() {
+    els.helpModal.classList.remove("hidden");
   }
 
   function showModeSelect() {
@@ -1159,24 +1235,19 @@
 
   function render() {
     if (!state) return;
-    els.modeName.textContent = state.mode === "crown" ? "Trash: Crown Debt" : "Trash";
+    els.modeName.textContent = gameTitle();
     renderGrid(els.humanGrid, human);
     renderGrid(els.botGrid, bot);
 
     const humanUp = state.players[human].slots.filter((slot) => slot.up).length;
     const botUp = state.players[bot].slots.filter((slot) => slot.up).length;
-    els.humanProgress.textContent = `${humanUp}/${state.players[human].slots.length}`;
-    els.botProgress.textContent = `${botUp}/${state.players[bot].slots.length}`;
-    els.humanNeed.textContent = isCrownMode()
-      ? `Need ${state.players[human].targetSize} · ${state.players[human].coins}c`
-      : `Need ${state.players[human].targetSize}`;
-    els.botNeed.textContent = isCrownMode()
-      ? `Need ${state.players[bot].targetSize} · ${state.players[bot].coins}c`
-      : `Need ${state.players[bot].targetSize}`;
+    renderCoinHud();
+    els.humanNeed.textContent = `Need ${state.players[human].targetSize}`;
+    els.botNeed.textContent = `Need ${state.players[bot].targetSize}`;
     els.humanTrack.style.width = `${(humanUp / state.players[human].slots.length) * 100}%`;
     els.botTrack.style.width = `${(botUp / state.players[bot].slots.length) * 100}%`;
-    els.turnPill.textContent = state.turn === human ? "Your turn" : "Bot turn";
-    els.humanTurnText.textContent = state.turn === human ? (state.phase === "draw" ? "Draw" : "Place") : "Waiting";
+    els.turnPill.textContent = state.turn === human && state.phase !== "waiting" ? "Your turn" : "Bot turn";
+    els.humanTurnText.textContent = state.turn === human && state.phase !== "waiting" ? (state.phase === "draw" ? "Draw" : "Place") : "Waiting";
     els.botTurnText.textContent = state.turn === bot || state.phase === "waiting" ? "Playing" : "Waiting";
     document.body.classList.toggle("bot-turn", state.turn === bot || state.phase === "waiting");
     els.deckCount.textContent = state.deck.length;
@@ -1205,6 +1276,8 @@
 
   els.modeFullscreen.addEventListener("click", toggleFullscreen);
   els.fullscreenButton.addEventListener("click", toggleFullscreen);
+  els.helpButton.addEventListener("click", showHelp);
+  els.closeHelp.addEventListener("click", () => els.helpModal.classList.add("hidden"));
   els.deckPile.addEventListener("pointerdown", (event) => beginPileDrag(event, "deck"));
   els.discardPile.addEventListener("pointerdown", (event) => beginPileDrag(event, "discard"));
   els.currentCard.querySelector(".mini-card").addEventListener("pointerdown", beginHeldDrag);
@@ -1214,6 +1287,10 @@
   });
   els.discardPile.addEventListener("click", () => {
     if (suppressClick) return;
+    if (state && state.turn === human && state.phase === "place" && state.held) {
+      trashHeld();
+      return;
+    }
     drawFromDiscard();
   });
   els.newGame.addEventListener("click", showModeSelect);

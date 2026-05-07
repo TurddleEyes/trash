@@ -14,7 +14,10 @@
   --gold: #edbd58;
   --edge: rgba(255, 255, 255, 0.16);
   --shadow: rgba(0, 0, 0, 0.32);
+  --app-width: 100vw;
   --app-height: 100dvh;
+  --stage-width: 100vw;
+  --stage-height: 100dvh;
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
@@ -30,12 +33,15 @@ body {
 }
 
 body {
+  width: 100%;
   height: var(--app-height);
   background:
     radial-gradient(circle at 18% 10%, rgba(237, 189, 88, 0.16), transparent 17rem),
     radial-gradient(circle at 88% 82%, rgba(60, 126, 173, 0.16), transparent 20rem),
     linear-gradient(145deg, #081817, #11252a 52%, #211c1c);
   color: var(--ink);
+  display: grid;
+  place-items: center;
   overflow: hidden;
 }
 
@@ -45,12 +51,14 @@ button {
 }
 
 .game-shell {
-  height: var(--app-height);
-  min-height: var(--app-height);
+  width: var(--stage-width);
+  height: var(--stage-height);
+  min-height: 0;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   gap: 12px;
   padding: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
+  overflow: hidden;
 }
 
 .game-shell.hidden {
@@ -58,7 +66,7 @@ button {
 }
 
 .top-bar,
-.score-strip,
+.coin-strip,
 .player-line,
 .piles-row {
   display: flex;
@@ -96,26 +104,28 @@ button {
   text-transform: uppercase;
 }
 
-.score-strip {
+.coin-strip {
   justify-content: center;
-  padding: 7px;
+  padding: 6px;
   border: 1px solid var(--edge);
   border-radius: 8px;
   background: rgba(12, 17, 20, 0.74);
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.22);
 }
 
-.score-strip div {
-  min-width: 72px;
-  padding: 7px 10px;
+.coin-card,
+.round-card {
+  position: relative;
+  min-width: 62px;
+  padding: 6px 9px;
   border-radius: 7px;
   background: rgba(255, 255, 255, 0.06);
   display: grid;
   gap: 1px;
 }
 
-.score-strip span,
-.score-strip small,
+.coin-strip span,
+.coin-strip small,
 .player-line small,
 .pile-label {
   color: var(--muted);
@@ -125,14 +135,39 @@ button {
   text-transform: uppercase;
 }
 
-.score-strip strong {
+.coin-strip strong {
   font-size: 1.02rem;
+  line-height: 1;
+}
+
+.coin-strip b {
+  font: inherit;
+}
+
+.coin-pop {
+  position: absolute;
+  top: -12px;
+  right: 8px;
+  min-width: max-content;
+  color: var(--gold);
+  font-size: 0.74rem;
+  font-style: normal;
+  font-weight: 950;
+  pointer-events: none;
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.45);
+  opacity: 0;
+  transform: translateY(5px) scale(0.96);
+}
+
+.coin-pop.show {
+  animation: coinFloat 960ms cubic-bezier(0.17, 0.84, 0.32, 1) both;
 }
 
 .screen-overlay {
   position: fixed;
   inset: 0;
   z-index: 80;
+  min-height: var(--app-height);
   display: grid;
   place-items: center;
   padding: 22px;
@@ -220,6 +255,24 @@ button {
   cursor: pointer;
   font-weight: 900;
   transition: transform 170ms ease, background 170ms ease, border-color 170ms ease;
+}
+
+.mode-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.help-button {
+  width: 44px;
+  min-height: 44px;
+  padding: 0;
+  border: 1px solid rgba(237, 189, 88, 0.45);
+  border-radius: 8px;
+  background: rgba(237, 189, 88, 0.14);
+  color: var(--ink);
+  cursor: pointer;
+  font-size: 1.05rem;
+  font-weight: 950;
 }
 
 .fullscreen-button:hover {
@@ -514,6 +567,9 @@ button {
 }
 
 .deck-pile {
+  width: min(76px, 21vw);
+  min-height: 0;
+  aspect-ratio: 5 / 7;
   background:
     repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.16) 0 6px, transparent 6px 12px),
     linear-gradient(145deg, #285c98, #19366d);
@@ -634,6 +690,10 @@ button {
   width: min(720px, 100%);
 }
 
+.help-card {
+  width: min(760px, 100%);
+}
+
 .modal-card h2 {
   margin: 8px 0;
   font-size: 2rem;
@@ -648,6 +708,24 @@ button {
   font-size: 0.85rem;
   color: var(--gold);
   text-transform: uppercase;
+}
+
+.help-copy {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.help-copy section {
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.055);
+  padding: 12px;
+}
+
+.help-copy p {
+  margin: 8px 0 0;
+  font-size: 0.86rem;
+  line-height: 1.32;
 }
 
 .modal-card button {
@@ -774,8 +852,9 @@ button {
 }
 
 .fullscreen-mode .game-shell {
-  height: var(--app-height);
-  min-height: var(--app-height);
+  width: var(--stage-width);
+  height: var(--stage-height);
+  min-height: 0;
 }
 
 .fullscreen-mode .table-surface {
@@ -836,6 +915,25 @@ button {
   }
 }
 
+@keyframes coinFloat {
+  0% {
+    opacity: 0;
+    transform: translateY(8px) scale(0.94);
+  }
+  18% {
+    opacity: 1;
+    transform: translateY(0) scale(1.05);
+  }
+  72% {
+    opacity: 1;
+    transform: translateY(-9px) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-17px) scale(0.98);
+  }
+}
+
 @keyframes modalLift {
   from {
     opacity: 0;
@@ -849,8 +947,10 @@ button {
 
 @media (min-width: 760px) {
   .game-shell {
-    max-width: 1180px;
-    margin: 0 auto;
+    width: var(--stage-width);
+    max-width: none;
+    height: var(--stage-height);
+    margin: auto;
     padding: 18px;
   }
 
@@ -882,6 +982,11 @@ button {
     width: 100%;
   }
 
+  .deck-pile {
+    width: min(94px, 100%);
+    justify-self: center;
+  }
+
   .card-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     grid-template-rows: repeat(5, auto);
@@ -910,6 +1015,45 @@ button {
   }
 }
 
+@media (min-width: 760px) {
+  body.stage-portrait .table {
+    grid-template-columns: none;
+    grid-template-rows: minmax(0, 1fr) auto minmax(0, 1.04fr);
+    gap: 12px;
+  }
+
+  body.stage-portrait .opponent,
+  body.stage-portrait .human,
+  body.stage-portrait .center-play {
+    order: 0;
+  }
+
+  body.stage-portrait .center-play {
+    grid-template-rows: auto auto auto auto auto;
+  }
+
+  body.stage-portrait .piles-row {
+    display: flex;
+  }
+
+  body.stage-portrait .pile {
+    width: min(145px, 30vw);
+  }
+
+  body.stage-portrait .card-grid {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    grid-template-rows: repeat(2, auto);
+  }
+
+  body.stage-portrait .card {
+    width: min(100%, clamp(56px, 10vw, 94px));
+  }
+
+  body.stage-portrait .card .rank {
+    font-size: 2rem;
+  }
+}
+
 @media (max-width: 620px) {
   html,
   body {
@@ -918,7 +1062,8 @@ button {
   }
 
   .game-shell {
-    height: var(--app-height);
+    width: var(--stage-width);
+    height: var(--stage-height);
     min-height: 0;
     gap: 5px;
     grid-template-rows: auto minmax(0, 1fr);
@@ -949,7 +1094,7 @@ button {
     gap: 6px;
   }
 
-  .score-strip {
+  .coin-strip {
     grid-column: 1 / -1;
     order: 3;
     width: 100%;
@@ -958,17 +1103,18 @@ button {
     gap: 7px;
   }
 
-  .score-strip div {
+  .coin-card,
+  .round-card {
     flex: 1;
     padding: 5px 8px;
   }
 
-  .score-strip strong {
+  .coin-strip strong {
     font-size: 0.92rem;
   }
 
-  .score-strip span,
-  .score-strip small {
+  .coin-strip span,
+  .coin-strip small {
     font-size: 0.58rem;
   }
 
@@ -1036,6 +1182,10 @@ button {
     width: min(116px, 32vw);
   }
 
+  .deck-pile {
+    width: min(68px, 19vw);
+  }
+
   .mini-card {
     width: min(40px, 100%);
     font-size: 0.86rem;
@@ -1075,7 +1225,17 @@ button {
   }
 
   .fullscreen-button {
+    flex: 1;
     width: 100%;
+  }
+
+  .mode-actions {
+    width: 100%;
+  }
+
+  .help-copy {
+    grid-template-columns: 1fr;
+    gap: 8px;
   }
 
   .item-grid {
@@ -1087,7 +1247,7 @@ button {
   }
 
   .modal-card {
-    max-height: calc(var(--app-height) - 16px);
+    max-height: calc(var(--stage-height) - 16px);
     overflow: auto;
     padding: 14px;
   }
@@ -1175,7 +1335,8 @@ button {
     font-size: 1.16rem;
   }
 
-  .score-strip div {
+  .coin-card,
+  .round-card {
     padding: 4px 7px;
   }
 
@@ -1208,6 +1369,10 @@ button {
     width: min(104px, 30vw);
   }
 
+  .deck-pile {
+    width: min(58px, 17vw);
+  }
+
   .mini-card {
     width: min(34px, 100%);
   }
@@ -1222,6 +1387,254 @@ button {
 
   .fullscreen-mode .mini-card {
     width: min(36px, 100%);
+  }
+}
+
+@media (orientation: landscape) and (max-height: 620px) {
+  html,
+  body {
+    height: var(--app-height);
+    min-height: 0;
+  }
+
+  .game-shell {
+    width: var(--stage-width);
+    height: var(--stage-height);
+    min-height: 0;
+    gap: 4px;
+    padding: max(4px, env(safe-area-inset-top)) max(6px, env(safe-area-inset-right)) max(4px, env(safe-area-inset-bottom)) max(6px, env(safe-area-inset-left));
+  }
+
+  .top-bar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .brand-block {
+    flex: 1 1 auto;
+  }
+
+  .top-bar h1 {
+    font-size: clamp(0.95rem, 3.5vh, 1.25rem);
+  }
+
+  .eyebrow {
+    font-size: clamp(0.5rem, 2vh, 0.62rem);
+  }
+
+  .coin-strip {
+    order: 0;
+    grid-column: auto;
+    width: auto;
+    flex: 0 0 auto;
+    padding: 4px;
+    gap: 5px;
+  }
+
+  .coin-card,
+  .round-card {
+    min-width: 54px;
+    padding: 3px 6px;
+  }
+
+  .coin-strip strong {
+    font-size: 0.72rem;
+  }
+
+  .coin-strip span,
+  .coin-strip small {
+    font-size: 0.5rem;
+  }
+
+  .header-actions {
+    gap: 4px;
+  }
+
+  .icon-button {
+    width: 34px;
+    min-height: 34px;
+    font-size: 0.95rem;
+  }
+
+  .table-surface {
+    padding: 4px;
+    border-radius: 7px;
+    background-size: 24px 24px, 24px 24px, auto, auto;
+    box-shadow: inset 0 0 0 4px rgba(0, 0, 0, 0.14), 0 14px 32px rgba(0, 0, 0, 0.22);
+  }
+
+  .table {
+    grid-template-columns: minmax(0, 1fr) minmax(132px, 0.56fr) minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
+    gap: 5px;
+    align-items: stretch;
+  }
+
+  .opponent {
+    order: 3;
+  }
+
+  .human {
+    order: 1;
+  }
+
+  .center-play {
+    order: 2;
+    gap: 3px;
+    grid-template-rows: auto auto auto minmax(0, auto) auto;
+  }
+
+  .player-panel {
+    padding: 4px;
+    gap: 3px;
+  }
+
+  .player-line span {
+    font-size: 0.72rem;
+  }
+
+  .player-line small,
+  .pile-label {
+    font-size: 0.5rem;
+  }
+
+  .progress-track {
+    width: min(68px, 14vw);
+    height: 5px;
+  }
+
+  .card-grid {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    grid-template-rows: repeat(2, auto);
+    gap: 3px;
+  }
+
+  .card,
+  .fullscreen-mode .card {
+    width: min(100%, clamp(28px, 9.8vh, 42px));
+    border-radius: 6px;
+  }
+
+  .card .rank {
+    font-size: 0.78rem;
+  }
+
+  .card .suit {
+    right: 5px;
+    bottom: 3px;
+    font-size: 0.62rem;
+  }
+
+  .slot-number {
+    top: 4px;
+    left: 5px;
+    font-size: 0.46rem;
+  }
+
+  .turn-pill {
+    min-width: 76px;
+    padding: 4px 8px;
+    font-size: 0.56rem;
+  }
+
+  .table-status {
+    max-width: 100%;
+    min-height: 0;
+    padding: 4px 6px;
+    font-size: 0.56rem;
+  }
+
+  .piles-row {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 5px;
+  }
+
+  .pile,
+  .current-card {
+    min-height: 42px;
+    padding: 4px;
+  }
+
+  .pile,
+  .fullscreen-mode .pile {
+    width: 100%;
+    max-width: 112px;
+    justify-self: center;
+  }
+
+  .deck-pile,
+  .fullscreen-mode .deck-pile {
+    width: min(42px, 11vh);
+    max-width: none;
+  }
+
+  .pile-count {
+    font-size: 1.05rem;
+  }
+
+  .mini-card,
+  .fullscreen-mode .mini-card {
+    width: min(32px, 100%);
+    border-radius: 6px;
+    font-size: 0.76rem;
+  }
+
+  .current-card {
+    width: 100%;
+    min-height: 44px;
+  }
+
+  .inventory-bar {
+    min-height: 22px;
+    gap: 4px;
+  }
+
+  .item-chip {
+    min-height: 22px;
+    padding: 0 6px;
+    font-size: 0.54rem;
+  }
+
+  .modal {
+    padding: 6px;
+  }
+
+  .modal-card {
+    max-height: calc(var(--stage-height) - 12px);
+    overflow: auto;
+    padding: 12px;
+  }
+
+  .wide-card {
+    width: min(840px, calc(var(--stage-width) - 12px));
+  }
+
+  .item-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+  }
+
+  .item-card {
+    padding: 7px;
+    gap: 4px;
+  }
+
+  .item-card strong {
+    font-size: 0.85rem;
+  }
+
+  .item-card span,
+  .item-card p {
+    font-size: 0.66rem;
+    line-height: 1.12;
+  }
+
+  .item-card button,
+  .modal-card button {
+    min-height: 30px;
+    font-size: 0.72rem;
   }
 }
 

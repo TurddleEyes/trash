@@ -14,7 +14,7 @@
         position: fixed !important;
         inset: 0 !important;
         z-index: 80 !important;
-        min-height: 100vh !important;
+        min-height: var(--app-height, 100vh) !important;
         display: grid !important;
         place-items: center !important;
         padding: 22px !important;
@@ -37,7 +37,13 @@
         margin-bottom: 0 !important;
       }
 
-      .fullscreen-button {
+      .mode-actions {
+        display: flex !important;
+        gap: 8px !important;
+      }
+
+      .fullscreen-button,
+      .help-button {
         min-height: 44px !important;
         padding: 0 16px !important;
         border: 1px solid rgba(237, 189, 88, 0.45) !important;
@@ -45,6 +51,11 @@
         background: rgba(237, 189, 88, 0.14) !important;
         color: #f7f1e7 !important;
         font-weight: 900 !important;
+      }
+
+      .help-button {
+        width: 44px !important;
+        padding: 0 !important;
       }
 
       .mode-grid {
@@ -76,7 +87,12 @@
           gap: 10px !important;
         }
 
+        .mode-actions {
+          width: 100% !important;
+        }
+
         .fullscreen-button {
+          flex: 1 !important;
           width: 100% !important;
         }
 
@@ -99,7 +115,10 @@
             <p class="eyebrow">Trash Cards</p>
             <h1 id="modeTitle">Choose your table.</h1>
           </div>
-          <button id="modeFullscreen" class="fullscreen-button" type="button">Open fullscreen</button>
+          <div class="mode-actions">
+            <button id="modeFullscreen" class="fullscreen-button" type="button">Open fullscreen</button>
+            <button id="helpButton" class="help-button" type="button" aria-label="How to play" title="How to play">?</button>
+          </div>
         </div>
         <div class="mode-grid">
           <button class="mode-card" type="button" data-mode="classic">
@@ -117,19 +136,24 @@
     <main id="gameShell" class="game-shell hidden">
       <header class="top-bar">
         <div class="brand-block">
-          <p id="modeName" class="eyebrow">Trash Cards</p>
-          <h1>A-10 or bust.</h1>
+          <h1 id="modeName">Trash Cards</h1>
         </div>
-        <div class="score-strip" aria-label="Round progress">
-          <div>
+        <div class="coin-strip" aria-label="Coins and round info">
+          <div class="coin-card human-coins">
             <span>You</span>
-            <strong id="humanProgress">0/10</strong>
+            <strong><b id="humanCoins">0</b>c</strong>
             <small id="humanNeed">Need 10</small>
+            <em id="humanCoinPop" class="coin-pop" aria-hidden="true"></em>
           </div>
-          <div>
+          <div class="coin-card bot-coins">
             <span>Bot</span>
-            <strong id="botProgress">0/10</strong>
+            <strong><b id="botCoins">0</b>c</strong>
             <small id="botNeed">Need 10</small>
+            <em id="botCoinPop" class="coin-pop" aria-hidden="true"></em>
+          </div>
+          <div class="round-card">
+            <span>Round</span>
+            <strong id="roundHud">1</strong>
           </div>
         </div>
         <div class="header-actions">
@@ -184,6 +208,30 @@
         </section>
       </section>
     </main>
+
+    <div id="helpModal" class="modal hidden help-modal" role="dialog" aria-modal="true" aria-labelledby="helpTitle">
+      <div class="modal-card help-card">
+        <p class="eyebrow">How to play</p>
+        <h2 id="helpTitle">Trash Cards</h2>
+        <div class="help-copy">
+          <section>
+            <h3>Classic Trash</h3>
+            <p>Each player starts with ten face-down slots numbered 1 through 10. Ace goes in slot 1, cards 2 through 10 go in matching slots, and jacks, queens, and kings are trash.</p>
+            <p>On your turn, draw from the deck or take the top discard. If the card fits an empty slot, place it there. The hidden card underneath becomes your current card, and you keep placing as long as the current card fits somewhere.</p>
+            <p>When your current card is a face card, is higher than your current board size, or matches a slot you already filled, drag it to the discard pile. That ends your turn and the bot plays.</p>
+            <p>The first player to fill every slot wins the round. The winner needs one fewer card next round, dropping from 10 to 9, then 8, and so on. Win a round while needing only one card to win the match.</p>
+          </section>
+          <section>
+            <h3>Trash: Crown Debt</h3>
+            <p>Crown Debt keeps the same card rules, then adds coins, items, and between-round shop choices. You earn live coins for strong moves, then more coins when a round ends.</p>
+            <p>Move coins appear next to the coin counter. Placing a card earns coins immediately, longer chains pay more, taking a useful discard can pay extra, and trashing face cards can still be worth something.</p>
+            <p>Between rounds, the shop offers items such as Peek, Second Draw, Burn Pile, Swap, Wild Chance, and the legendary Debt of the Crown. You can hold two items. If you win a round while holding two items, you must throw one away before shopping.</p>
+            <p>Debt of the Crown is the expensive comeback item. Use it from the shop to add one required card to the opponent's next board, capped at ten cards.</p>
+          </section>
+        </div>
+        <button id="closeHelp" type="button">Back</button>
+      </div>
+    </div>
 
     <div id="roundModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="roundTitle">
       <div class="modal-card">
