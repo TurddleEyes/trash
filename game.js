@@ -5,40 +5,77 @@
   const bot = 1;
 
   const ITEMS = {
-    peek: {
-      name: "Peek",
-      cost: 3,
-      text: "Briefly reveal one of your face-down cards."
-    },
-    secondDraw: {
-      name: "Second Draw",
+    oracle: {
+      name: "Oracle Lens",
       cost: 5,
-      text: "If your current card cannot be placed, discard it and draw again."
+      tier: "common",
+      text: "Reveal two face-down cards, then swap them."
     },
     burn: {
       name: "Burn Pile",
-      cost: 4,
+      cost: 5,
+      tier: "common",
       text: "Burn the top discard and flip a fresh card onto the pile."
+    },
+    coinPurse: {
+      name: "Coin Purse",
+      cost: 0,
+      tier: "common",
+      immediate: true,
+      text: "Gain 3 coins now, then buy nothing else this shop."
+    },
+    pardon: {
+      name: "Royal Pardon",
+      cost: 7,
+      tier: "uncommon",
+      text: "Discard an unplayable current card and draw again."
+    },
+    graveGrab: {
+      name: "Grave Grab",
+      cost: 8,
+      tier: "uncommon",
+      text: "Trash your unplayable card and steal the previous discard."
+    },
+    loadedDraw: {
+      name: "Loaded Draw",
+      cost: 10,
+      tier: "uncommon",
+      text: "Draw two cards from the deck, keep the better one."
     },
     swap: {
       name: "Swap",
-      cost: 6,
+      cost: 8,
+      tier: "rare",
       text: "Swap two face-down cards on your board."
     },
-    wild: {
-      name: "Wild Chance",
-      cost: 7,
-      text: "Discard a face card and draw again."
+    shield: {
+      name: "Crown Shield",
+      cost: 12,
+      tier: "rare",
+      text: "Automatically blocks the next Debt of the Crown."
+    },
+    wildSeal: {
+      name: "Wild Seal",
+      cost: 12,
+      tier: "rare",
+      text: "Place one face card into any empty slot."
     },
     debt: {
       name: "Debt of the Crown",
-      cost: 30,
+      cost: 28,
+      tier: "legendary",
       legendary: true,
-      text: "Opponent adds 1 required card next round. Cannot exceed 10."
+      text: "Opponent adds 1 required card next round. Rare after round 3."
     }
   };
 
-  const shopPool = ["peek", "peek", "secondDraw", "burn", "burn", "swap", "wild", "debt"];
+  const SHOP_TIERS = {
+    common: ["oracle", "burn", "coinPurse"],
+    uncommon: ["pardon", "graveGrab", "loadedDraw"],
+    rare: ["swap", "shield", "wildSeal"],
+    legendary: ["debt"]
+  };
+  const BOT_SHOP_ITEMS = new Set(["burn", "coinPurse", "pardon", "graveGrab", "loadedDraw", "shield", "debt"]);
   const MUSIC_FOLDER = "assets/audio/music/";
   const AUDIO_FILES = {
     music: "assets/audio/lofi-loop.mp3",
@@ -383,6 +420,7 @@
       pendingItem: null,
       pendingPurchase: null,
       shopOffers: [],
+      shopLocked: false,
       players: [createPlayer("You"), createPlayer("Bot")]
     };
     els.modeScreen.classList.add("hidden");
@@ -502,31 +540,6 @@
     els.botCoins.textContent = state.players[bot].coins;
   }
 
-  function awardMoveCoins(playerIndex, amount, reason) {
-    if (!isCrownMode() || amount <= 0) return;
-    state.players[playerIndex].coins += amount;
-    renderCoinHud();
-    showCoinPop(playerIndex, amount, reason);
-  }
-
-  function placementReward(playerIndex) {
-    if (!isCrownMode()) return;
-    let amount = 1;
-    const parts = ["place"];
-    if (state.drawSource === "discard" && state.turnPlacements === 1) {
-      amount += 1;
-      parts.push("discard");
-    }
-    if (state.turnPlacements === 3) {
-      amount += 2;
-      parts.push("chain");
-    } else if (state.turnPlacements > 3) {
-      amount += 1;
-      parts.push("chain");
-    }
-    awardMoveCoins(playerIndex, amount, parts.join(" + "));
-  }
-
   function drawFromDeck() {
     if (!canHumanDraw()) return;
     drawFrom("deck", els.deckPile.getBoundingClientRect(), human);
@@ -581,7 +594,6 @@
     }
     state.turnPlacements += 1;
     state.players[playerIndex].maxChain = Math.max(state.players[playerIndex].maxChain, state.turnPlacements);
-    placementReward(playerIndex);
 
     if (checkWinner(playerIndex)) return endRound(playerIndex);
 
@@ -614,7 +626,6 @@
     state.discard.push(trashed);
     state.held = null;
     state.drawSource = null;
-    if (trashed.value > 10) awardMoveCoins(playerIndex, 1, "face trash");
     animateCard(trashed, sourceRect, targetRect, "trash");
     bumpElement(els.discardPile);
     playSfx("discard");
@@ -631,7 +642,11 @@
     const topDiscard = state.discard[state.discard.length - 1];
     const useDiscard = isPlayable(topDiscard, bot);
     state.drawSource = useDiscard ? "discard" : "deck";
-    state.held = useDiscard ? state.discard.pop() : drawDeckCard();
+    if (useDiscard) {
+      state.held = state.discard.pop();
+    } else if (!botMaybeUseLoadedDraw()) {
+      state.held = drawDeckCard();
+    }
     const origin = useDiscard ? els.discardPile.getBoundingClientRect() : els.deckPile.getBoundingClientRect();
     render();
     animateCard(state.held, origin, currentRect(), "draw");
@@ -672,16 +687,61 @@
     return true;
   }
 
+  function drawLoadedCards(playerIndex) {
+    const cards = [drawDeckCard(), drawDeckCard()].filter(Boolean);
+    if (!cards.length) return null;
+    const playable = cards.filter((card) => isPlayable(card, playerIndex));
+    const keep = playable.length
+      ? playable.sort((a, b) => a.value - b.value)[0]
+      : cards[0];
+    cards.forEach((card) => {
+      if (card !== keep) state.discard.push(card);
+    });
+    return keep;
+  }
+
+  function loadedDraw(playerIndex, itemIndex) {
+    const keep = drawLoadedCards(playerIndex);
+    if (!keep) {
+      setStatus("The deck is empty.");
+      return false;
+    }
+    state.held = keep;
+    state.phase = "place";
+    state.drawSource = "deck";
+    state.turnPlacements = 0;
+    consumeItem(playerIndex, itemIndex);
+    if (playerIndex === human) {
+      setStatus(`Loaded Draw kept ${cardLabel(keep)}.`);
+      afterDraw(human);
+    }
+    return true;
+  }
+
+  function botMaybeUseLoadedDraw() {
+    if (!isCrownMode()) return false;
+    const itemIndex = state.players[bot].items.indexOf("loadedDraw");
+    if (itemIndex < 0) return false;
+    return loadedDraw(bot, itemIndex);
+  }
+
   function botMaybeRedraw() {
     if (!isCrownMode() || !state.held) return false;
-    const secondIndex = state.players[bot].items.indexOf("secondDraw");
-    const wildIndex = state.players[bot].items.indexOf("wild");
-    const usableIndex = secondIndex >= 0 ? secondIndex : (state.held.value > 10 ? wildIndex : -1);
-    if (usableIndex < 0) return false;
+    const pardonIndex = state.players[bot].items.indexOf("pardon");
+    const graveIndex = state.players[bot].items.indexOf("graveGrab");
+    if (graveIndex >= 0 && state.discard.length && !isPlayable(state.held, bot) && isPlayable(state.discard[state.discard.length - 1], bot)) {
+      const grabbed = state.discard.pop();
+      state.discard.push(state.held);
+      state.held = grabbed;
+      state.drawSource = "discard";
+      consumeItem(bot, graveIndex);
+      return true;
+    }
+    if (pardonIndex < 0) return false;
     state.discard.push(state.held);
     state.held = drawDeckCard();
     state.drawSource = "deck";
-    consumeItem(bot, usableIndex);
+    consumeItem(bot, pardonIndex);
     return true;
   }
 
@@ -742,11 +802,11 @@
   function awardCoins(winner, winnerWasBehind) {
     const lines = [];
     state.players.forEach((player, index) => {
-      let coins = index === winner ? 5 : 2;
-      const parts = [index === winner ? "+5 round win" : "+2 stayed in it"];
+      let coins = index === winner ? 4 : 1;
+      const parts = [index === winner ? "+4 round win" : "+1 stayed in it"];
       if (player.maxChain >= 3) {
-        coins += 2;
-        parts.push("+2 chain");
+        coins += 1;
+        parts.push("+1 chain");
       }
       if (player.discardPlace) {
         coins += 1;
@@ -757,14 +817,15 @@
         parts.push("+1 face trash");
       }
       if (index === winner && winnerWasBehind) {
-        coins += 4;
-        parts.push("+4 comeback");
+        coins += 2;
+        parts.push("+2 comeback");
       }
       if (index === winner && !player.itemUsedThisRound) {
-        coins += 2;
-        parts.push("+2 no item used");
+        coins += 1;
+        parts.push("+1 no item used");
       }
       player.coins += coins;
+      showCoinPop(index, coins, "round");
       lines.push(`${player.name}: +${coins} coins (${parts.join(", ")})`);
     });
     return lines;
@@ -799,9 +860,11 @@
 
   function showShop(message) {
     if (!state.shopOffers.length) state.shopOffers = generateShopOffers();
+    state.shopLocked = false;
+    state.pendingPurchase = null;
     hideAllModals();
     els.shopModal.classList.remove("hidden");
-    els.shopStatus.textContent = message || "Buy, replace, use Debt of the Crown, or skip ahead.";
+    els.shopStatus.textContent = message || "Buy, replace, claim, use Debt of the Crown, or skip ahead.";
     renderShop();
     render();
     playSfx("shop");
@@ -809,12 +872,25 @@
 
   function generateShopOffers() {
     const offers = [];
-    const pool = [...shopPool];
-    while (offers.length < 3 && pool.length) {
-      const id = pool.splice(Math.floor(Math.random() * pool.length), 1)[0];
-      if (!offers.includes(id)) offers.push(id);
+    addShopOffer(offers, SHOP_TIERS.common);
+    addShopOffer(offers, SHOP_TIERS.common);
+
+    const legendaryRoll = state.round >= 3 && Math.random() < 0.08;
+    if (legendaryRoll) {
+      addShopOffer(offers, SHOP_TIERS.legendary);
+    } else {
+      addShopOffer(offers, Math.random() < 0.35 ? SHOP_TIERS.rare : SHOP_TIERS.uncommon);
     }
+
+    const fallbackPool = [...SHOP_TIERS.common, ...SHOP_TIERS.uncommon, ...SHOP_TIERS.rare];
+    while (offers.length < 3) addShopOffer(offers, fallbackPool);
     return offers;
+  }
+
+  function addShopOffer(offers, pool) {
+    const candidates = pool.filter((itemId) => !offers.includes(itemId));
+    if (!candidates.length) return;
+    offers.push(candidates[Math.floor(Math.random() * candidates.length)]);
   }
 
   function renderShop() {
@@ -847,17 +923,24 @@
         handler: () => useDebt(index)
       });
     }
+    if (itemId === "shield") {
+      actions.push({
+        text: "Passive",
+        disabled: true
+      });
+    }
     return itemCard(itemId, actions);
   }
 
   function shopOfferCard(itemId) {
     const item = ITEMS[itemId];
     const canAfford = state.players[human].coins >= item.cost;
-    const full = state.players[human].items.length >= 2;
+    const full = state.players[human].items.length >= 2 && !item.immediate;
+    const actionText = itemId === "coinPurse" ? "Claim +3" : full ? "Replace..." : `Buy for ${item.cost}`;
     return itemCard(itemId, [{
-      text: full ? "Replace..." : `Buy for ${item.cost}`,
+      text: actionText,
       primary: true,
-      disabled: !canAfford,
+      disabled: !canAfford || state.shopLocked,
       handler: () => buyOffer(itemId)
     }]);
   }
@@ -888,7 +971,7 @@
     title.textContent = item.name;
     const cost = document.createElement("span");
     cost.className = "item-cost";
-    cost.textContent = item.legendary ? `${item.cost} coins · Legendary` : `${item.cost} coins`;
+    cost.textContent = item.cost === 0 ? "Free" : item.legendary ? `${item.cost} coins · Legendary` : `${item.cost} coins`;
     const text = document.createElement("p");
     text.className = "item-text";
     text.textContent = item.text;
@@ -912,7 +995,7 @@
       button.textContent = action.text;
       if (action.primary) button.classList.add("primary");
       button.disabled = Boolean(action.disabled);
-      button.addEventListener("click", action.handler);
+      if (typeof action.handler === "function") button.addEventListener("click", action.handler);
       actionWrap.appendChild(button);
     });
     card.appendChild(actionWrap);
@@ -922,8 +1005,23 @@
   function buyOffer(itemId) {
     const player = state.players[human];
     const item = ITEMS[itemId];
+    if (state.shopLocked) {
+      els.shopStatus.textContent = "Coin Purse already paid out. Start the next round when ready.";
+      return;
+    }
     if (player.coins < item.cost) {
       els.shopStatus.textContent = "Not enough coins.";
+      return;
+    }
+    if (itemId === "coinPurse") {
+      player.coins += 3;
+      state.shopLocked = true;
+      state.pendingPurchase = null;
+      state.shopOffers = state.shopOffers.filter((offer) => offer !== itemId);
+      els.shopStatus.textContent = "Claimed Coin Purse for +3 coins. The shop is closed for buying.";
+      renderShop();
+      render();
+      showCoinPop(human, 3, "purse");
       return;
     }
     if (player.items.length >= 2) {
@@ -955,14 +1053,35 @@
     render();
   }
 
+  function consumeNamedItem(playerIndex, itemId) {
+    const itemIndex = state.players[playerIndex].items.indexOf(itemId);
+    if (itemIndex < 0) return false;
+    state.players[playerIndex].items.splice(itemIndex, 1);
+    state.players[playerIndex].itemUsedThisRound = true;
+    return true;
+  }
+
+  function applyDebt(attackerIndex, targetIndex) {
+    const target = state.players[targetIndex];
+    if (consumeNamedItem(targetIndex, "shield")) {
+      return "blocked";
+    }
+    if (target.targetSize >= 10) return "max";
+    target.targetSize += 1;
+    state.players[attackerIndex].itemUsedThisRound = true;
+    return "hit";
+  }
+
   function useDebt(index) {
-    if (state.players[bot].targetSize >= 10) {
+    const result = applyDebt(human, bot);
+    if (result === "max") {
       els.shopStatus.textContent = "Bot is already back at 10 cards.";
       return;
     }
-    state.players[bot].targetSize += 1;
     state.players[human].items.splice(index, 1);
-    els.shopStatus.textContent = `Debt of the Crown hit. Bot now needs ${state.players[bot].targetSize}.`;
+    els.shopStatus.textContent = result === "blocked"
+      ? "Debt of the Crown was blocked by Bot's Crown Shield."
+      : `Debt of the Crown hit. Bot now needs ${state.players[bot].targetSize}.`;
     renderShop();
     render();
   }
@@ -982,15 +1101,20 @@
     const debtIndex = botPlayer.items.indexOf("debt");
     if (debtIndex >= 0 && state.players[human].targetSize < 10) {
       botPlayer.items.splice(debtIndex, 1);
-      state.players[human].targetSize += 1;
+      applyDebt(bot, human);
     }
 
     const offers = generateShopOffers()
+      .filter((itemId) => BOT_SHOP_ITEMS.has(itemId))
       .filter((itemId) => botPlayer.coins >= ITEMS[itemId].cost)
       .filter((itemId) => itemId !== "debt" || state.players[human].targetSize < 10)
+      .filter((itemId) => itemId !== "coinPurse" || botPlayer.items.length >= 2)
       .sort((a, b) => ITEMS[b].cost - ITEMS[a].cost);
-    if (botPlayer.items.length < 2 && offers.length) {
-      const pick = offers[0];
+    if (botPlayer.items.length >= 2 && offers.includes("coinPurse")) {
+      botPlayer.coins += 3;
+    } else if (botPlayer.items.length < 2 && offers.length) {
+      const pick = offers.find((itemId) => itemId !== "coinPurse");
+      if (!pick) return;
       botPlayer.items.push(pick);
       botPlayer.coins -= ITEMS[pick].cost;
     }
@@ -998,6 +1122,9 @@
 
   function continueToNextRound() {
     state.round += 1;
+    state.shopOffers = [];
+    state.shopLocked = false;
+    state.pendingPurchase = null;
     startRound();
   }
 
@@ -1024,9 +1151,9 @@
     const itemId = state.players[human].items[index];
     if (!itemId || state.turn !== human || state.over) return;
 
-    if (itemId === "peek") {
-      state.pendingItem = { type: "peek", index };
-      setStatus("Tap a face-down card to peek.");
+    if (itemId === "oracle") {
+      state.pendingItem = { type: "oracle", index, picks: [] };
+      setStatus("Tap two face-down cards to reveal and swap.");
       render();
       return;
     }
@@ -1052,9 +1179,9 @@
       return;
     }
 
-    if (itemId === "secondDraw") {
+    if (itemId === "pardon") {
       if (state.phase !== "place" || !state.held || isPlayable(state.held, human)) {
-        setStatus("Second Draw needs an unplayable current card.");
+        setStatus("Royal Pardon needs an unplayable current card.");
         return;
       }
       state.discard.push(state.held);
@@ -1065,16 +1192,42 @@
       return;
     }
 
-    if (itemId === "wild") {
-      if (state.phase !== "place" || !state.held || state.held.value <= 10) {
-        setStatus("Wild Chance needs a face card.");
+    if (itemId === "graveGrab") {
+      if (state.phase !== "place" || !state.held || isPlayable(state.held, human) || state.discard.length === 0) {
+        setStatus("Grave Grab needs an unplayable current card and a discard to steal.");
         return;
       }
+      const grabbed = state.discard.pop();
       state.discard.push(state.held);
-      state.held = drawDeckCard();
-      state.drawSource = "deck";
+      state.held = grabbed;
+      state.drawSource = "discard";
       consumeItem(human, index);
       afterDraw(human);
+      return;
+    }
+
+    if (itemId === "loadedDraw") {
+      if (state.phase !== "draw") {
+        setStatus("Loaded Draw can be used before you draw.");
+        return;
+      }
+      loadedDraw(human, index);
+      return;
+    }
+
+    if (itemId === "wildSeal") {
+      if (state.phase !== "place" || !state.held || state.held.value <= 10) {
+        setStatus("Wild Seal needs a face card as your current card.");
+        return;
+      }
+      state.pendingItem = { type: "wildSeal", index };
+      setStatus("Tap any empty slot for the sealed face card.");
+      render();
+      return;
+    }
+
+    if (itemId === "shield") {
+      setStatus("Crown Shield blocks the next Debt of the Crown automatically.");
       return;
     }
 
@@ -1090,17 +1243,28 @@
     const slot = slots[index];
     if (!slot || slot.up) return true;
 
-    if (pending.type === "peek") {
+    if (pending.type === "oracle") {
       slot.peeked = true;
+      if (pending.picks.includes(index)) return true;
+      pending.picks.push(index);
+      if (pending.picks.length < 2) {
+        setStatus(`Slot ${index + 1} hides ${cardLabel(slot.card)}. Choose one more.`);
+        render();
+        return true;
+      }
+      const [first, second] = pending.picks;
+      state.pendingItem = null;
       consumeItem(human, pending.index);
-      setStatus(`Slot ${index + 1} hides ${cardLabel(slot.card)}.`);
+      setStatus(`Oracle Lens found ${cardLabel(slots[first].card)} and ${cardLabel(slots[second].card)}.`);
       render();
       window.setTimeout(() => {
-        if (!slot.up) {
-          slot.peeked = false;
-          render();
-        }
-      }, 1600);
+        if (!state || state.over) return;
+        [slots[first].card, slots[second].card] = [slots[second].card, slots[first].card];
+        slots[first].peeked = false;
+        slots[second].peeked = false;
+        setStatus(`Oracle Lens swapped slots ${first + 1} and ${second + 1}.`);
+        render();
+      }, 1200);
       return true;
     }
 
@@ -1122,7 +1286,41 @@
       return true;
     }
 
+    if (pending.type === "wildSeal") {
+      if (!state.held || state.held.value <= 10) return true;
+      placeWildSeal(index, pending.index);
+      return true;
+    }
+
     return false;
+  }
+
+  function placeWildSeal(index, itemIndex) {
+    if (state.over || state.phase !== "place" || !state.held || state.players[human].slots[index].up) return;
+    const sourceRect = currentRect();
+    const targetRect = cardRect(human, index);
+    const placed = state.held;
+    const slot = state.players[human].slots[index];
+    const bumped = slot.card;
+    slot.card = placed;
+    slot.up = true;
+    slot.peeked = false;
+    state.held = bumped;
+    state.turnPlacements += 1;
+    state.players[human].maxChain = Math.max(state.players[human].maxChain, state.turnPlacements);
+    consumeItem(human, itemIndex);
+
+    if (checkWinner(human)) return endRound(human);
+
+    if (isPlayable(state.held, human)) {
+      setStatus(`Wild Seal landed. Keep going with ${cardLabel(state.held)}.`);
+    } else {
+      setStatus(`Wild Seal landed. ${cardLabel(state.held)} is trash.`);
+    }
+    render();
+    animateCard(placed, sourceRect, targetRect, "place");
+    bumpElement(els.currentCard);
+    playSfx("place");
   }
 
   function consumeItem(playerIndex, index) {
