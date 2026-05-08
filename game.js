@@ -975,10 +975,16 @@
     const text = document.createElement("p");
     text.className = "item-text";
     text.textContent = item.text;
-    card.append(icon, title, cost, text);
+    const head = document.createElement("div");
+    head.className = "item-head";
+    head.append(icon, title);
+    card.append(head, text);
 
     const actionWrap = document.createElement("div");
     actionWrap.className = "item-actions";
+    const foot = document.createElement("div");
+    foot.className = "item-foot";
+    foot.append(cost, actionWrap);
 
     if (typeof actions === "string") {
       const button = document.createElement("button");
@@ -986,7 +992,7 @@
       button.className = "primary";
       button.addEventListener("click", legacyHandler);
       actionWrap.appendChild(button);
-      card.appendChild(actionWrap);
+      card.appendChild(foot);
       return card;
     }
 
@@ -998,7 +1004,7 @@
       if (typeof action.handler === "function") button.addEventListener("click", action.handler);
       actionWrap.appendChild(button);
     });
-    card.appendChild(actionWrap);
+    card.appendChild(foot);
     return card;
   }
 
