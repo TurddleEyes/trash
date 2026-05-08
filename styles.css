@@ -233,8 +233,7 @@ button {
   background: linear-gradient(145deg, rgba(237, 189, 88, 0.18), rgba(255, 255, 255, 0.08));
 }
 
-.mode-card span,
-.item-card strong {
+.mode-card span {
   font-size: 1.25rem;
   font-weight: 950;
 }
@@ -811,10 +810,11 @@ button {
   position: relative;
   aspect-ratio: 1;
   min-height: 0;
-  padding: 8px;
+  padding: 7px;
   display: grid;
-  grid-template-rows: 34px minmax(0, 1fr) auto auto;
-  gap: 4px;
+  grid-template-rows: 30px minmax(22px, auto) 10px 26px;
+  gap: 3px;
+  align-items: center;
   overflow: hidden;
   isolation: isolate;
   box-shadow: 0 14px 30px rgba(0, 0, 0, 0.2);
@@ -855,9 +855,10 @@ button {
 
 .item-icon {
   position: relative;
-  width: 34px;
-  height: 34px;
+  width: 30px;
+  height: 30px;
   justify-self: center;
+  align-self: center;
   border: 1px solid rgba(237, 189, 88, 0.42);
   border-radius: 8px;
   display: block;
@@ -1072,16 +1073,23 @@ button {
   font-weight: 950;
 }
 
-.item-title {
+.item-card .item-title {
   min-width: 0;
-  font-size: 0.78rem;
-  line-height: 1.02;
-  align-self: end;
+  max-height: 2em;
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  align-self: center;
+  justify-self: stretch;
+  font-size: 0.72rem;
+  line-height: 1;
 }
 
-.item-cost {
+.item-card .item-cost {
   font-size: 0.66rem;
   line-height: 1;
+  align-self: center;
 }
 
 .item-text {
@@ -1091,11 +1099,11 @@ button {
 .item-actions {
   display: grid;
   gap: 4px;
-  align-self: end;
+  align-self: stretch;
 }
 
 .item-card button {
-  min-height: 28px;
+  min-height: 26px;
   border: 1px solid var(--edge);
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.1);
@@ -1601,20 +1609,20 @@ button {
 
   .item-card {
     padding: 7px;
-    grid-template-rows: 30px minmax(0, 1fr) auto auto;
-    gap: 4px;
+    grid-template-rows: 28px minmax(20px, auto) 9px 26px;
+    gap: 3px;
   }
 
   .item-icon {
-    width: 30px;
-    height: 30px;
+    width: 28px;
+    height: 28px;
   }
 
-  .item-card strong {
-    font-size: 0.72rem;
+  .item-card .item-title {
+    font-size: 0.68rem;
   }
 
-  .item-card span {
+  .item-card .item-cost {
     font-size: 0.58rem;
   }
 
@@ -1942,20 +1950,20 @@ button {
 
   .item-card {
     padding: 6px;
-    grid-template-rows: 28px minmax(0, 1fr) auto auto;
-    gap: 4px;
+    grid-template-rows: 26px minmax(19px, auto) 9px 24px;
+    gap: 3px;
   }
 
   .item-icon {
-    width: 28px;
-    height: 28px;
+    width: 26px;
+    height: 26px;
   }
 
-  .item-card strong {
-    font-size: 0.68rem;
+  .item-card .item-title {
+    font-size: 0.64rem;
   }
 
-  .item-card span,
+  .item-card .item-cost,
   .item-card.empty p {
     font-size: 0.56rem;
     line-height: 1.08;
