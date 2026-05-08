@@ -5,12 +5,6 @@
   const bot = 1;
 
   const ITEMS = {
-    oracle: {
-      name: "Oracle Lens",
-      cost: 5,
-      tier: "common",
-      text: "Reveal two face-down cards, then swap them."
-    },
     burn: {
       name: "Burn Pile",
       cost: 5,
@@ -23,6 +17,12 @@
       tier: "common",
       immediate: true,
       text: "Gain 3 coins now, then buy nothing else this shop."
+    },
+    luckyMatch: {
+      name: "Lucky Match",
+      cost: 6,
+      tier: "common",
+      text: "Flip one hidden card that is already in its correct slot."
     },
     pardon: {
       name: "Royal Pardon",
@@ -42,11 +42,24 @@
       tier: "uncommon",
       text: "Draw two cards from the deck, keep the better one."
     },
-    swap: {
-      name: "Swap",
+    taxCollector: {
+      name: "Tax Collector",
       cost: 8,
+      tier: "uncommon",
+      shopUse: true,
+      text: "Steal up to 3 coins from the opponent between rounds."
+    },
+    sabotage: {
+      name: "Sabotage",
+      cost: 12,
       tier: "rare",
-      text: "Swap two face-down cards on your board."
+      text: "Flip one random opponent placed card back face-down."
+    },
+    chaosCut: {
+      name: "Chaos Cut",
+      cost: 11,
+      tier: "rare",
+      text: "Shuffle every face-down card on both boards."
     },
     shield: {
       name: "Crown Shield",
@@ -70,12 +83,12 @@
   };
 
   const SHOP_TIERS = {
-    common: ["oracle", "burn", "coinPurse"],
-    uncommon: ["pardon", "graveGrab", "loadedDraw"],
-    rare: ["swap", "shield", "wildSeal"],
+    common: ["burn", "coinPurse", "luckyMatch"],
+    uncommon: ["pardon", "graveGrab", "loadedDraw", "taxCollector"],
+    rare: ["sabotage", "chaosCut", "shield", "wildSeal"],
     legendary: ["debt"]
   };
-  const BOT_SHOP_ITEMS = new Set(["burn", "coinPurse", "pardon", "graveGrab", "loadedDraw", "shield", "debt"]);
+  const BOT_SHOP_ITEMS = new Set(["burn", "coinPurse", "luckyMatch", "pardon", "graveGrab", "loadedDraw", "taxCollector", "sabotage", "chaosCut", "shield", "debt"]);
   const MUSIC_FOLDER = "assets/audio/music/";
   const AUDIO_FILES = {
     music: "assets/audio/lofi-loop.mp3",
@@ -473,6 +486,14 @@
     return deck;
   }
 
+  function shuffleInPlace(items) {
+    for (let i = items.length - 1; i > 0; i -= 1) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [items[i], items[j]] = [items[j], items[i]];
+    }
+    return items;
+  }
+
   function dealSlots(deck, count) {
     return Array.from({ length: count }, () => ({
       card: deck.pop(),
@@ -637,6 +658,11 @@
     state.turnPlacements = 0;
     render();
 
+    botMaybeUseSabotage();
+    if (state.over) return;
+    botMaybeUseLuckyMatch();
+    if (state.over) return;
+    botMaybeUseChaosCut();
     botMaybeUseBurn();
     const topDiscard = state.discard[state.discard.length - 1];
     const useDiscard = isPlayable(topDiscard, bot);
@@ -722,6 +748,108 @@
     const itemIndex = state.players[bot].items.indexOf("loadedDraw");
     if (itemIndex < 0) return false;
     return loadedDraw(bot, itemIndex);
+  }
+
+  function correctHiddenSlots(playerIndex) {
+    return state.players[playerIndex].slots
+      .map((slot, index) => ({ slot, index }))
+      .filter(({ slot, index }) => !slot.up && slot.card.value === index + 1);
+  }
+
+  function faceUpSlots(playerIndex) {
+    return state.players[playerIndex].slots
+      .map((slot, index) => ({ slot, index }))
+      .filter(({ slot }) => slot.up);
+  }
+
+  function hiddenSlots(playerIndex) {
+    return state.players[playerIndex].slots
+      .map((slot, index) => ({ slot, index, playerIndex }))
+      .filter(({ slot }) => !slot.up);
+  }
+
+  function useLuckyMatch(playerIndex, itemIndex) {
+    const matches = correctHiddenSlots(playerIndex);
+    if (!matches.length) return false;
+    const { slot, index } = matches[Math.floor(Math.random() * matches.length)];
+    slot.up = true;
+    slot.peeked = false;
+    consumeItem(playerIndex, itemIndex);
+    if (checkWinner(playerIndex)) {
+      endRound(playerIndex);
+      return true;
+    }
+    if (playerIndex === human) setStatus(`Lucky Match flipped slot ${index + 1}.`);
+    render();
+    bumpElement(cardElement(playerIndex, index));
+    return true;
+  }
+
+  function useSabotage(attackerIndex, targetIndex, itemIndex) {
+    const targets = faceUpSlots(targetIndex);
+    if (!targets.length) return false;
+    const { slot, index } = targets[Math.floor(Math.random() * targets.length)];
+    slot.up = false;
+    slot.peeked = false;
+    consumeItem(attackerIndex, itemIndex);
+    if (attackerIndex === human) setStatus(`Sabotage flipped Bot slot ${index + 1} face-down.`);
+    render();
+    bumpElement(cardElement(targetIndex, index));
+    return true;
+  }
+
+  function useChaosCut(playerIndex, itemIndex) {
+    const targets = [human, bot].flatMap((index) => hiddenSlots(index));
+    if (targets.length < 2) return false;
+    const cards = shuffleInPlace(targets.map(({ slot }) => slot.card));
+    targets.forEach(({ slot }, index) => {
+      slot.card = cards[index];
+      slot.peeked = false;
+    });
+    consumeItem(playerIndex, itemIndex);
+    if (playerIndex === human) setStatus("Chaos Cut shuffled every face-down card on both boards.");
+    render();
+    return true;
+  }
+
+  function useTaxCollector(attackerIndex, targetIndex, itemIndex) {
+    const amount = Math.min(3, state.players[targetIndex].coins);
+    if (amount <= 0) return false;
+    state.players[targetIndex].coins -= amount;
+    state.players[attackerIndex].coins += amount;
+    consumeItem(attackerIndex, itemIndex);
+    if (attackerIndex === human) {
+      els.shopStatus.textContent = `Tax Collector stole ${amount} coins from Bot.`;
+      showCoinPop(human, amount, "tax");
+    }
+    renderShop();
+    render();
+    return true;
+  }
+
+  function botMaybeUseLuckyMatch() {
+    if (!isCrownMode()) return false;
+    const itemIndex = state.players[bot].items.indexOf("luckyMatch");
+    if (itemIndex < 0 || !correctHiddenSlots(bot).length) return false;
+    return useLuckyMatch(bot, itemIndex);
+  }
+
+  function botMaybeUseSabotage() {
+    if (!isCrownMode()) return false;
+    const itemIndex = state.players[bot].items.indexOf("sabotage");
+    const botUp = faceUpSlots(bot).length;
+    const humanUp = faceUpSlots(human).length;
+    if (itemIndex < 0 || humanUp < 2 || humanUp <= botUp) return false;
+    return useSabotage(bot, human, itemIndex);
+  }
+
+  function botMaybeUseChaosCut() {
+    if (!isCrownMode()) return false;
+    const itemIndex = state.players[bot].items.indexOf("chaosCut");
+    const botUp = faceUpSlots(bot).length;
+    const humanUp = faceUpSlots(human).length;
+    if (itemIndex < 0 || humanUp <= botUp || hiddenSlots(human).length + hiddenSlots(bot).length < 4) return false;
+    return useChaosCut(bot, itemIndex);
   }
 
   function botMaybeRedraw() {
@@ -922,6 +1050,14 @@
         handler: () => useDebt(index)
       });
     }
+    if (ITEMS[itemId].shopUse) {
+      actions.push({
+        text: "Use",
+        primary: true,
+        disabled: !canUseShopItem(itemId, human),
+        handler: () => useShopItem(itemId, index, human, bot)
+      });
+    }
     if (itemId === "shield") {
       actions.push({
         text: "Passive",
@@ -929,6 +1065,20 @@
       });
     }
     return itemCard(itemId, actions);
+  }
+
+  function canUseShopItem(itemId, playerIndex) {
+    const targetIndex = playerIndex === human ? bot : human;
+    if (itemId === "taxCollector") return state.players[targetIndex].coins > 0;
+    return false;
+  }
+
+  function useShopItem(itemId, itemIndex, playerIndex, targetIndex) {
+    if (itemId === "taxCollector") {
+      if (!useTaxCollector(playerIndex, targetIndex, itemIndex) && playerIndex === human) {
+        els.shopStatus.textContent = "Bot has no coins to steal.";
+      }
+    }
   }
 
   function shopOfferCard(itemId) {
@@ -1108,6 +1258,10 @@
       botPlayer.items.splice(debtIndex, 1);
       applyDebt(bot, human);
     }
+    const taxIndex = botPlayer.items.indexOf("taxCollector");
+    if (taxIndex >= 0 && state.players[human].coins > 0) {
+      useTaxCollector(bot, human, taxIndex);
+    }
 
     const offers = generateShopOffers()
       .filter((itemId) => BOT_SHOP_ITEMS.has(itemId))
@@ -1156,20 +1310,6 @@
     const itemId = state.players[human].items[index];
     if (!itemId || state.turn !== human || state.over) return;
 
-    if (itemId === "oracle") {
-      state.pendingItem = { type: "oracle", index, picks: [] };
-      setStatus("Tap two face-down cards to reveal and swap.");
-      render();
-      return;
-    }
-
-    if (itemId === "swap") {
-      state.pendingItem = { type: "swap", index, picks: [] };
-      setStatus("Tap two face-down cards to swap.");
-      render();
-      return;
-    }
-
     if (itemId === "burn") {
       if (state.phase !== "draw" || state.discard.length === 0) {
         setStatus("Burn Pile can be used before you draw.");
@@ -1181,6 +1321,25 @@
       consumeItem(human, index);
       setStatus("Burned the discard pile. Choose your draw.");
       render();
+      return;
+    }
+
+    if (itemId === "luckyMatch") {
+      if (!useLuckyMatch(human, index)) setStatus("Lucky Match needs a hidden card already in the right slot.");
+      return;
+    }
+
+    if (itemId === "sabotage") {
+      if (!useSabotage(human, bot, index)) setStatus("Sabotage needs Bot to have at least one placed card.");
+      return;
+    }
+
+    if (itemId === "chaosCut") {
+      if (state.phase !== "draw") {
+        setStatus("Chaos Cut can be used before you draw.");
+        return;
+      }
+      if (!useChaosCut(human, index)) setStatus("Chaos Cut needs at least two face-down cards on the table.");
       return;
     }
 
@@ -1238,6 +1397,11 @@
 
     if (itemId === "debt") {
       setStatus("Use Debt of the Crown in the shop between rounds.");
+      return;
+    }
+
+    if (itemId === "taxCollector") {
+      setStatus("Use Tax Collector in the shop between rounds.");
     }
   }
 
@@ -1247,49 +1411,6 @@
     const slots = state.players[human].slots;
     const slot = slots[index];
     if (!slot || slot.up) return true;
-
-    if (pending.type === "oracle") {
-      slot.peeked = true;
-      if (pending.picks.includes(index)) return true;
-      pending.picks.push(index);
-      if (pending.picks.length < 2) {
-        setStatus(`Slot ${index + 1} hides ${cardLabel(slot.card)}. Choose one more.`);
-        render();
-        return true;
-      }
-      const [first, second] = pending.picks;
-      state.pendingItem = null;
-      consumeItem(human, pending.index);
-      setStatus(`Oracle Lens found ${cardLabel(slots[first].card)} and ${cardLabel(slots[second].card)}.`);
-      render();
-      window.setTimeout(() => {
-        if (!state || state.over) return;
-        [slots[first].card, slots[second].card] = [slots[second].card, slots[first].card];
-        slots[first].peeked = false;
-        slots[second].peeked = false;
-        setStatus(`Oracle Lens swapped slots ${first + 1} and ${second + 1}.`);
-        render();
-      }, 1200);
-      return true;
-    }
-
-    if (pending.type === "swap") {
-      if (pending.picks.includes(index)) return true;
-      pending.picks.push(index);
-      if (pending.picks.length < 2) {
-        setStatus("Choose the second face-down card.");
-        render();
-        return true;
-      }
-      const [first, second] = pending.picks;
-      [slots[first].card, slots[second].card] = [slots[second].card, slots[first].card];
-      slots[first].peeked = false;
-      slots[second].peeked = false;
-      consumeItem(human, pending.index);
-      setStatus(`Swapped slots ${first + 1} and ${second + 1}.`);
-      render();
-      return true;
-    }
 
     if (pending.type === "wildSeal") {
       if (!state.held || state.held.value <= 10) return true;
@@ -1404,6 +1525,11 @@
   function cardRect(owner, index) {
     const grid = owner === human ? els.humanGrid : els.botGrid;
     return grid.children[index].getBoundingClientRect();
+  }
+
+  function cardElement(owner, index) {
+    const grid = owner === human ? els.humanGrid : els.botGrid;
+    return grid.children[index];
   }
 
   function animateCard(card, fromRect, toRect, kind) {
