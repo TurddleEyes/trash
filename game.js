@@ -173,18 +173,17 @@
     const height = Math.max(1, Math.round(visualHeight || window.innerHeight || document.documentElement.clientHeight));
     const width = Math.max(1, Math.round(visualWidth || window.innerWidth || document.documentElement.clientWidth));
     const landscape = width >= height;
-    const stageAspect = landscape ? 16 / 9 : 9 / 16;
-    let stageWidth = width;
-    let stageHeight = height;
-
-    if (stageWidth / stageHeight > stageAspect) {
-      stageWidth = Math.floor(stageHeight * stageAspect);
-    } else {
-      stageHeight = Math.floor(stageWidth / stageAspect);
-    }
+    const designWidth = landscape ? 1920 : 1080;
+    const designHeight = landscape ? 1080 : 1920;
+    const stageScale = Math.min(width / designWidth, height / designHeight);
+    const stageWidth = Math.floor(designWidth * stageScale);
+    const stageHeight = Math.floor(designHeight * stageScale);
 
     document.documentElement.style.setProperty("--app-width", `${width}px`);
     document.documentElement.style.setProperty("--app-height", `${height}px`);
+    document.documentElement.style.setProperty("--design-width", `${designWidth}px`);
+    document.documentElement.style.setProperty("--design-height", `${designHeight}px`);
+    document.documentElement.style.setProperty("--stage-scale", stageScale.toFixed(5));
     document.documentElement.style.setProperty("--stage-width", `${stageWidth}px`);
     document.documentElement.style.setProperty("--stage-height", `${stageHeight}px`);
     document.body.classList.toggle("stage-landscape", landscape);

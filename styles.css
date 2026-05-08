@@ -18,6 +18,9 @@
   --app-height: 100dvh;
   --stage-width: 100vw;
   --stage-height: 100dvh;
+  --design-width: 1920px;
+  --design-height: 1080px;
+  --stage-scale: 1;
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
@@ -51,14 +54,19 @@ button {
 }
 
 .game-shell {
-  width: var(--stage-width);
-  height: var(--stage-height);
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  width: var(--design-width);
+  height: var(--design-height);
   min-height: 0;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   gap: 12px;
   padding: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
   overflow: hidden;
+  transform: translate(-50%, -50%) scale(var(--stage-scale));
+  transform-origin: center center;
 }
 
 .game-shell.hidden {
@@ -1201,8 +1209,8 @@ button {
 }
 
 .fullscreen-mode .game-shell {
-  width: var(--stage-width);
-  height: var(--stage-height);
+  width: var(--design-width);
+  height: var(--design-height);
   min-height: 0;
 }
 
@@ -2010,6 +2018,285 @@ button {
     min-height: 26px;
     font-size: 0.64rem;
   }
+}
+
+.game-shell,
+.fullscreen-mode .game-shell {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  width: var(--design-width);
+  height: var(--design-height);
+  max-width: none;
+  max-height: none;
+  margin: auto;
+  transform: translate(-50%, -50%) scale(var(--stage-scale));
+  transform-origin: center center;
+}
+
+body.stage-landscape .game-shell,
+body.stage-portrait .game-shell {
+  gap: 12px;
+  padding: 18px;
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+body.stage-landscape .top-bar,
+body.stage-portrait .top-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+body.stage-landscape .brand-block,
+body.stage-portrait .brand-block {
+  flex: 1 1 auto;
+}
+
+body.stage-landscape .top-bar h1,
+body.stage-portrait .top-bar h1 {
+  font-size: 2rem;
+}
+
+body.stage-landscape .coin-strip,
+body.stage-portrait .coin-strip {
+  order: 0;
+  grid-column: auto;
+  width: auto;
+  flex: 0 0 auto;
+  justify-content: center;
+  gap: 12px;
+  padding: 6px;
+}
+
+body.stage-landscape .coin-card,
+body.stage-portrait .coin-card {
+  min-width: 68px;
+  padding: 7px 10px;
+}
+
+body.stage-landscape .coin-strip span,
+body.stage-portrait .coin-strip span {
+  font-size: 0.72rem;
+}
+
+body.stage-landscape .coin-strip strong,
+body.stage-portrait .coin-strip strong {
+  font-size: 1.02rem;
+}
+
+body.stage-landscape .header-actions,
+body.stage-portrait .header-actions {
+  gap: 8px;
+}
+
+body.stage-landscape .icon-button,
+body.stage-portrait .icon-button {
+  width: 46px;
+  min-height: 46px;
+  font-size: 1.12rem;
+}
+
+body.stage-landscape .table-surface,
+body.stage-portrait .table-surface {
+  padding: 12px;
+  border-radius: 8px;
+  background-size: 28px 28px, 28px 28px, auto, auto;
+  box-shadow: inset 0 0 0 8px rgba(0, 0, 0, 0.16), 0 24px 70px rgba(0, 0, 0, 0.26);
+}
+
+body.stage-landscape .table {
+  grid-template-columns: minmax(0, 1fr) 230px minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  gap: 12px;
+  align-items: stretch;
+}
+
+body.stage-portrait .table {
+  grid-template-columns: none;
+  grid-template-rows: minmax(0, 1fr) auto minmax(0, 1.04fr);
+  gap: 12px;
+}
+
+body.stage-landscape .opponent {
+  order: 3;
+}
+
+body.stage-landscape .human {
+  order: 1;
+}
+
+body.stage-landscape .center-play {
+  order: 2;
+}
+
+body.stage-portrait .opponent,
+body.stage-portrait .human,
+body.stage-portrait .center-play {
+  order: 0;
+}
+
+body.stage-landscape .player-panel,
+body.stage-portrait .player-panel {
+  padding: 10px;
+  gap: 8px;
+}
+
+body.stage-landscape .player-line span,
+body.stage-portrait .player-line span {
+  font-size: 0.98rem;
+}
+
+body.stage-landscape .player-line small,
+body.stage-portrait .player-line small,
+body.stage-landscape .pile-label,
+body.stage-portrait .pile-label {
+  font-size: 0.72rem;
+}
+
+body.stage-landscape .progress-track,
+body.stage-portrait .progress-track {
+  width: 128px;
+  height: 8px;
+}
+
+body.stage-landscape .card-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-rows: repeat(5, auto);
+  gap: 8px;
+}
+
+body.stage-portrait .card-grid {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-rows: repeat(2, auto);
+  gap: 8px;
+}
+
+body.stage-landscape .card,
+body.stage-landscape.fullscreen-mode .card {
+  width: min(100%, 104px);
+  border-radius: 9px;
+}
+
+body.stage-portrait .card,
+body.stage-portrait.fullscreen-mode .card {
+  width: min(100%, 94px);
+  border-radius: 9px;
+}
+
+body.stage-landscape .card .rank,
+body.stage-portrait .card .rank {
+  font-size: 2.45rem;
+}
+
+body.stage-landscape .card .suit,
+body.stage-portrait .card .suit {
+  right: 8px;
+  bottom: 5px;
+  font-size: 1.05rem;
+}
+
+body.stage-landscape .slot-number,
+body.stage-portrait .slot-number {
+  top: 6px;
+  left: 8px;
+  font-size: 0.68rem;
+}
+
+body.stage-landscape .center-play,
+body.stage-portrait .center-play {
+  gap: 8px;
+  grid-template-rows: auto auto auto auto auto;
+}
+
+body.stage-landscape .center-play {
+  grid-template-rows: auto auto auto minmax(112px, auto) auto;
+}
+
+body.stage-landscape .turn-pill,
+body.stage-portrait .turn-pill {
+  min-width: 120px;
+  padding: 8px 13px;
+  font-size: 0.8rem;
+}
+
+body.stage-landscape .table-status,
+body.stage-portrait .table-status {
+  max-width: min(430px, 100%);
+  min-height: 32px;
+  padding: 8px 12px;
+  font-size: 0.86rem;
+}
+
+body.stage-landscape .piles-row {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
+body.stage-portrait .piles-row {
+  display: flex;
+  gap: 12px;
+}
+
+body.stage-landscape .pile,
+body.stage-portrait .pile,
+body.stage-landscape.fullscreen-mode .pile,
+body.stage-portrait.fullscreen-mode .pile {
+  width: min(145px, 100%);
+  max-width: none;
+  min-height: 96px;
+  padding: 10px;
+  justify-self: center;
+}
+
+body.stage-portrait .pile,
+body.stage-portrait.fullscreen-mode .pile {
+  width: 145px;
+}
+
+body.stage-landscape .deck-pile,
+body.stage-portrait .deck-pile,
+body.stage-landscape.fullscreen-mode .deck-pile,
+body.stage-portrait.fullscreen-mode .deck-pile {
+  width: 94px;
+  min-height: 0;
+  max-width: none;
+}
+
+body.stage-landscape .pile-count,
+body.stage-portrait .pile-count {
+  font-size: 2.1rem;
+}
+
+body.stage-landscape .mini-card,
+body.stage-portrait .mini-card,
+body.stage-landscape.fullscreen-mode .mini-card,
+body.stage-portrait.fullscreen-mode .mini-card {
+  width: min(72px, 100%);
+  border-radius: 9px;
+  font-size: 1.38rem;
+}
+
+body.stage-landscape .current-card,
+body.stage-portrait .current-card {
+  width: min(150px, 100%);
+  min-height: 104px;
+  padding: 10px;
+}
+
+body.stage-landscape .inventory-bar,
+body.stage-portrait .inventory-bar {
+  min-height: 38px;
+  gap: 7px;
+}
+
+body.stage-landscape .item-chip,
+body.stage-portrait .item-chip {
+  min-height: 34px;
+  padding: 0 10px;
+  font-size: 0.74rem;
 }
 
 @media (prefers-reduced-motion: reduce) {
