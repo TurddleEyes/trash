@@ -859,6 +859,8 @@
     const itemClassName = itemClass(itemId);
     const card = document.createElement("div");
     card.className = `item-card item-${itemClassName}${item.legendary ? " legendary" : ""}`;
+    card.title = item.text;
+    card.setAttribute("aria-label", `${item.name}. ${item.cost} coins. ${item.text}`);
     const icon = document.createElement("span");
     icon.className = `item-icon item-icon-${itemClassName}`;
     icon.setAttribute("aria-hidden", "true");
@@ -1416,10 +1418,17 @@
     renderCoinHud();
     els.humanTrack.style.width = `${(humanUp / state.players[human].slots.length) * 100}%`;
     els.botTrack.style.width = `${(botUp / state.players[bot].slots.length) * 100}%`;
-    els.turnPill.textContent = state.turn === human && state.phase !== "waiting" ? "Your turn" : "Bot turn";
-    els.humanTurnText.textContent = state.turn === human && state.phase !== "waiting" ? (state.phase === "draw" ? "Draw" : "Place") : "Waiting";
-    els.botTurnText.textContent = state.turn === bot || state.phase === "waiting" ? "Playing" : "Waiting";
-    document.body.classList.toggle("bot-turn", state.turn === bot || state.phase === "waiting");
+    if (state.phase === "over") {
+      els.turnPill.textContent = "Round over";
+      els.humanTurnText.textContent = checkWinner(human) ? "Won" : "Done";
+      els.botTurnText.textContent = checkWinner(bot) ? "Won" : "Done";
+      document.body.classList.remove("bot-turn");
+    } else {
+      els.turnPill.textContent = state.turn === human && state.phase !== "waiting" ? "Your turn" : "Bot turn";
+      els.humanTurnText.textContent = state.turn === human && state.phase !== "waiting" ? (state.phase === "draw" ? "Draw" : "Place") : "Waiting";
+      els.botTurnText.textContent = state.turn === bot || state.phase === "waiting" ? "Playing" : "Waiting";
+      document.body.classList.toggle("bot-turn", state.turn === bot || state.phase === "waiting");
+    }
     els.deckCount.textContent = state.deck.length;
     renderMini(els.discardCard, state.discard[state.discard.length - 1]);
     renderMini(els.currentCard.querySelector(".mini-card"), state.held);

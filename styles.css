@@ -433,7 +433,6 @@ button {
   transform-style: preserve-3d;
   box-shadow: 0 10px 18px rgba(0, 0, 0, 0.26);
   transition: transform 200ms ease, box-shadow 200ms ease, filter 200ms ease;
-  animation: cardSettle 280ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
   touch-action: none;
 }
 
@@ -455,7 +454,6 @@ button {
     var(--card);
   color: var(--card-ink);
   box-shadow: inset 0 0 0 1px rgba(29, 35, 34, 0.12), 0 14px 24px rgba(0, 0, 0, 0.28);
-  animation: flipIn 360ms cubic-bezier(0.17, 0.9, 0.29, 1.12) both;
 }
 
 .card.target {
@@ -794,18 +792,18 @@ button {
 }
 
 .item-grid {
-  grid-template-columns: repeat(auto-fit, minmax(106px, 126px));
+  grid-template-columns: repeat(auto-fit, minmax(96px, 112px));
   justify-content: start;
-  align-items: start;
+  align-items: stretch;
 }
 
 .item-card {
   position: relative;
   aspect-ratio: 1;
   min-height: 0;
-  padding: 9px;
+  padding: 8px;
   display: grid;
-  grid-template-rows: 34px auto auto minmax(0, 1fr) auto;
+  grid-template-rows: 34px minmax(0, 1fr) auto auto;
   gap: 4px;
   overflow: hidden;
   isolation: isolate;
@@ -830,11 +828,19 @@ button {
 }
 
 .item-card.empty {
+  grid-column: 1 / -1;
+  width: min(100%, 240px);
   aspect-ratio: auto;
-  min-height: 76px;
+  min-height: 44px;
   align-content: center;
   justify-items: center;
   text-align: center;
+}
+
+.item-card.empty p {
+  margin: 0;
+  font-size: 0.72rem;
+  line-height: 1.15;
 }
 
 .item-icon {
@@ -964,6 +970,7 @@ button {
   min-width: 0;
   font-size: 0.78rem;
   line-height: 1.02;
+  align-self: end;
 }
 
 .item-cost {
@@ -972,13 +979,7 @@ button {
 }
 
 .item-text {
-  min-height: 0;
-  overflow: hidden;
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  font-size: 0.62rem;
-  line-height: 1.15;
+  display: none;
 }
 
 .item-actions {
@@ -1494,7 +1495,7 @@ button {
 
   .item-card {
     padding: 7px;
-    grid-template-rows: 30px auto auto minmax(0, 1fr) auto;
+    grid-template-rows: 30px minmax(0, 1fr) auto auto;
     gap: 4px;
   }
 
@@ -1511,7 +1512,7 @@ button {
     font-size: 0.58rem;
   }
 
-  .item-card p {
+  .item-card.empty p {
     margin: 0;
     font-size: 0.58rem;
     line-height: 1.1;
@@ -1835,7 +1836,7 @@ button {
 
   .item-card {
     padding: 6px;
-    grid-template-rows: 28px auto auto minmax(0, 1fr) auto;
+    grid-template-rows: 28px minmax(0, 1fr) auto auto;
     gap: 4px;
   }
 
@@ -1849,7 +1850,7 @@ button {
   }
 
   .item-card span,
-  .item-card p {
+  .item-card.empty p {
     font-size: 0.56rem;
     line-height: 1.08;
   }
