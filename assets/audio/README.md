@@ -24,4 +24,4 @@ Current sound effects are stored in `assets/audio/SFX/`:
 
 Round wins intentionally do not play a victory sound. The victory SFX is reserved for the final match win.
 
-Browsers require a player tap before audio can start, so use the music-note button in the game header to turn sound on.
+Browsers require a player tap before audio can start. Use the music-note button for the background playlist and the sparkle button for card/shop/victory sound effects.

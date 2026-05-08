@@ -60,7 +60,8 @@
   const els = {
     modeScreen: document.getElementById("modeScreen"),
     gameShell: document.getElementById("gameShell"),
-    audioButton: document.getElementById("audioButton"),
+    musicButton: document.getElementById("musicButton"),
+    sfxButton: document.getElementById("sfxButton"),
     modeFullscreen: document.getElementById("modeFullscreen"),
     fullscreenButton: document.getElementById("fullscreenButton"),
     helpButton: document.getElementById("helpButton"),
@@ -108,7 +109,8 @@
   let modalAction = null;
   let fallbackFullscreen = false;
   const audioState = {
-    enabled: false,
+    musicEnabled: false,
+    sfxEnabled: false,
     initialized: false,
     musicTracks: [],
     currentMusicSrc: "",
@@ -118,9 +120,14 @@
   };
 
   try {
-    audioState.enabled = localStorage.getItem("trashCardsAudio") === "on";
+    const legacyAudio = localStorage.getItem("trashCardsAudio");
+    const savedMusic = localStorage.getItem("trashCardsMusic");
+    const savedSfx = localStorage.getItem("trashCardsSfx");
+    audioState.musicEnabled = savedMusic === null ? legacyAudio === "on" : savedMusic === "on";
+    audioState.sfxEnabled = savedSfx === null ? legacyAudio === "on" : savedSfx === "on";
   } catch (error) {
-    audioState.enabled = false;
+    audioState.musicEnabled = false;
+    audioState.sfxEnabled = false;
   }
 
   function setAppHeight() {
@@ -185,17 +192,23 @@
 
   function saveAudioPreference() {
     try {
-      localStorage.setItem("trashCardsAudio", audioState.enabled ? "on" : "off");
+      localStorage.setItem("trashCardsMusic", audioState.musicEnabled ? "on" : "off");
+      localStorage.setItem("trashCardsSfx", audioState.sfxEnabled ? "on" : "off");
     } catch (error) {
       // Audio still works without saved preferences.
     }
   }
 
+  function syncAudioButton(button, label, enabled) {
+    if (!button) return;
+    button.classList.toggle("audio-on", enabled);
+    button.title = `${label} ${enabled ? "on" : "off"}`;
+    button.setAttribute("aria-label", `${label} ${enabled ? "on" : "off"}`);
+  }
+
   function syncAudioUi() {
-    if (!els.audioButton) return;
-    els.audioButton.classList.toggle("audio-on", audioState.enabled);
-    els.audioButton.title = audioState.enabled ? "Audio on" : "Audio off";
-    els.audioButton.setAttribute("aria-label", audioState.enabled ? "Audio on" : "Audio off");
+    syncAudioButton(els.musicButton, "Music", audioState.musicEnabled);
+    syncAudioButton(els.sfxButton, "SFX", audioState.sfxEnabled);
   }
 
   function chooseMusicTrack() {
@@ -231,13 +244,13 @@
   }
 
   function playNextMusic() {
-    if (!audioState.enabled) return;
+    if (!audioState.musicEnabled) return;
     initAudio();
     startMusicTrack(chooseMusicTrack());
   }
 
   function playMusic() {
-    if (!audioState.enabled) return;
+    if (!audioState.musicEnabled) return;
     initAudio();
     if (audioState.music) {
       audioState.music.play().catch(() => {});
@@ -250,19 +263,25 @@
     if (audioState.music) audioState.music.pause();
   }
 
-  function toggleAudio() {
-    audioState.enabled = !audioState.enabled;
+  function toggleMusic() {
+    audioState.musicEnabled = !audioState.musicEnabled;
     saveAudioPreference();
     syncAudioUi();
-    if (audioState.enabled) {
+    if (audioState.musicEnabled) {
       playMusic();
     } else {
       pauseMusic();
     }
   }
 
+  function toggleSfx() {
+    audioState.sfxEnabled = !audioState.sfxEnabled;
+    saveAudioPreference();
+    syncAudioUi();
+  }
+
   function playSfx(name) {
-    if (!audioState.enabled) return;
+    if (!audioState.sfxEnabled) return;
     initAudio();
     const base = audioState.sfx[name];
     if (!base) return;
@@ -1455,7 +1474,8 @@
 
   els.modeFullscreen.addEventListener("click", toggleFullscreen);
   els.fullscreenButton.addEventListener("click", toggleFullscreen);
-  els.audioButton.addEventListener("click", toggleAudio);
+  els.musicButton.addEventListener("click", toggleMusic);
+  els.sfxButton.addEventListener("click", toggleSfx);
   els.helpButton.addEventListener("click", showHelp);
   els.closeHelp.addEventListener("click", () => els.helpModal.classList.add("hidden"));
   els.deckPile.addEventListener("pointerdown", (event) => beginPileDrag(event, "deck"));

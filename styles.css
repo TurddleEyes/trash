@@ -864,27 +864,29 @@ button {
 }
 
 .item-icon-peek::before {
-  width: 22px;
-  height: 13px;
-  left: 5px;
-  top: 10px;
+  width: 65%;
+  height: 38%;
+  left: 50%;
+  top: 50%;
   border: 2px solid var(--gold);
   border-radius: 50%;
+  transform: translate(-50%, -50%);
 }
 
 .item-icon-peek::after {
-  width: 7px;
-  height: 7px;
-  left: 13px;
-  top: 15px;
+  width: 22%;
+  height: 22%;
+  left: 50%;
+  top: 50%;
   border-radius: 50%;
   background: var(--gold);
+  transform: translate(-50%, -50%);
 }
 
 .item-icon-second-draw::before,
 .item-icon-second-draw::after {
-  width: 16px;
-  height: 21px;
+  width: 47%;
+  height: 62%;
   border-radius: 4px;
   background:
     linear-gradient(135deg, rgba(255, 255, 255, 0.86), rgba(255, 246, 219, 0.96));
@@ -892,35 +894,35 @@ button {
 }
 
 .item-icon-second-draw::before {
-  left: 7px;
-  top: 7px;
-  transform: rotate(-8deg);
+  left: 50%;
+  top: 50%;
+  transform: translate(-62%, -42%) rotate(-8deg);
 }
 
 .item-icon-second-draw::after {
-  left: 12px;
-  top: 5px;
-  transform: rotate(8deg);
+  left: 50%;
+  top: 50%;
+  transform: translate(-36%, -56%) rotate(8deg);
 }
 
 .item-icon-burn::before {
-  width: 17px;
-  height: 22px;
-  left: 9px;
-  top: 6px;
+  width: 50%;
+  height: 64%;
+  left: 50%;
+  top: 50%;
   border-radius: 70% 45% 70% 30%;
   background: linear-gradient(145deg, #ffe49a, var(--gold) 46%, #be2f3e 100%);
-  transform: rotate(36deg);
+  transform: translate(-50%, -50%) rotate(36deg);
 }
 
 .item-icon-burn::after {
-  width: 8px;
-  height: 12px;
-  left: 13px;
-  top: 13px;
+  width: 24%;
+  height: 35%;
+  left: 50%;
+  top: 52%;
   border-radius: 70% 45% 70% 30%;
   background: #fff7d7;
-  transform: rotate(36deg);
+  transform: translate(-50%, -50%) rotate(36deg);
 }
 
 .item-icon-swap::before {
@@ -935,30 +937,33 @@ button {
 }
 
 .item-icon-wild::before {
-  width: 23px;
-  height: 23px;
-  left: 5px;
-  top: 5px;
+  width: 68%;
+  height: 68%;
+  left: 50%;
+  top: 50%;
   background: linear-gradient(145deg, #fff2b8, var(--gold));
   clip-path: polygon(50% 0, 62% 34%, 98% 35%, 69% 56%, 79% 91%, 50% 70%, 21% 91%, 31% 56%, 2% 35%, 38% 34%);
+  transform: translate(-50%, -50%);
 }
 
 .item-icon-debt::before {
-  width: 25px;
-  height: 18px;
-  left: 4px;
-  top: 8px;
+  width: 74%;
+  height: 53%;
+  left: 50%;
+  top: 45%;
   background: linear-gradient(145deg, #fff1ae, var(--gold) 58%, #a96f22);
   clip-path: polygon(0 82%, 0 32%, 24% 62%, 50% 8%, 76% 62%, 100% 32%, 100% 82%);
+  transform: translate(-50%, -50%);
 }
 
 .item-icon-debt::after {
-  width: 24px;
-  height: 4px;
-  left: 5px;
-  top: 24px;
+  width: 70%;
+  height: 12%;
+  left: 50%;
+  top: 72%;
   border-radius: 999px;
   background: #fff1ae;
+  transform: translate(-50%, -50%);
 }
 
 .item-card span {
