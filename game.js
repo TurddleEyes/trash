@@ -195,6 +195,10 @@
     const hoverNone = window.matchMedia("(hover: none)").matches;
     const compactViewport = Math.min(width, height) <= 720 || Math.max(width, height) <= 1100;
     const mobileMode = coarsePointer || hoverNone || compactViewport;
+    const buttonTarget = landscape ? 54 : 44;
+    const buttonMin = landscape ? 86 : 112;
+    const buttonMax = landscape ? 150 : 130;
+    const mobileButtonSize = Math.round(Math.min(buttonMax, Math.max(buttonMin, buttonTarget / Math.max(stageScale, 0.01))));
 
     document.documentElement.style.setProperty("--app-width", `${width}px`);
     document.documentElement.style.setProperty("--app-height", `${height}px`);
@@ -203,6 +207,7 @@
     document.documentElement.style.setProperty("--stage-scale", stageScale.toFixed(5));
     document.documentElement.style.setProperty("--stage-width", `${stageWidth}px`);
     document.documentElement.style.setProperty("--stage-height", `${stageHeight}px`);
+    document.documentElement.style.setProperty("--mobile-button-size", `${mobileButtonSize}px`);
     document.body.classList.toggle("stage-landscape", landscape);
     document.body.classList.toggle("stage-portrait", !landscape);
     document.body.classList.toggle("mobile-mode", mobileMode);
