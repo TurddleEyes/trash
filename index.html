@@ -37,6 +37,15 @@
         margin-bottom: 0 !important;
       }
 
+      .game-logo {
+        margin: 0 0 8px !important;
+        color: #edbd58 !important;
+        font-size: clamp(3rem, 10vw, 6.25rem) !important;
+        font-weight: 950 !important;
+        line-height: 0.86 !important;
+        text-transform: uppercase !important;
+      }
+
       .mode-actions {
         display: flex !important;
         gap: 8px !important;
@@ -105,15 +114,15 @@
         }
       }
     </style>
-    <link rel="stylesheet" href="styles.css?v=stage-lock-1">
+    <link rel="stylesheet" href="styles.css?v=menu-logo-1">
   </head>
   <body>
     <section id="modeScreen" class="screen-overlay mode-select" aria-labelledby="modeTitle">
       <div class="mode-wrap">
         <div class="mode-heading">
           <div>
-            <p class="eyebrow">Trash Cards</p>
-            <h1 id="modeTitle">Choose your table.</h1>
+            <p class="game-logo">Trash Cards</p>
+            <h1 id="modeTitle">Choose your game</h1>
           </div>
           <div class="mode-actions">
             <button id="modeFullscreen" class="fullscreen-button" type="button">Open fullscreen</button>
@@ -122,7 +131,7 @@
         </div>
         <div class="mode-grid">
           <button class="mode-card" type="button" data-mode="classic">
-            <span>Trash</span>
+            <span>Classic Trash</span>
             <strong>Classic race from 10 cards down to 1.</strong>
           </button>
           <button class="mode-card featured" type="button" data-mode="crown">

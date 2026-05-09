@@ -22,6 +22,7 @@
   --design-height: 1080px;
   --stage-scale: 1;
   --mobile-button-size: 120px;
+  --logo-font: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
@@ -203,9 +204,39 @@ button {
 }
 
 .mode-wrap h1 {
-  margin: 6px 0 0;
-  font-size: clamp(2rem, 8vw, 4rem);
-  line-height: 0.95;
+  margin: 0;
+  color: var(--ink);
+  font-size: clamp(1.65rem, 4.8vw, 2.75rem);
+  line-height: 1;
+}
+
+.game-logo {
+  position: relative;
+  width: max-content;
+  max-width: 100%;
+  margin: 0 0 8px;
+  color: var(--gold);
+  font-family: var(--logo-font);
+  font-size: clamp(3rem, 10vw, 6.25rem);
+  font-weight: 950;
+  line-height: 0.86;
+  letter-spacing: 0;
+  text-transform: uppercase;
+  text-shadow:
+    0 3px 0 rgba(126, 77, 31, 0.7),
+    0 16px 38px rgba(0, 0, 0, 0.45);
+}
+
+.game-logo::after {
+  content: "";
+  position: absolute;
+  left: 0.08em;
+  right: 0.06em;
+  bottom: -0.12em;
+  height: 0.09em;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(237, 189, 88, 0.95), rgba(247, 241, 231, 0.72), rgba(190, 47, 62, 0.82));
+  box-shadow: 0 8px 20px rgba(237, 189, 88, 0.24);
 }
 
 .mode-grid,

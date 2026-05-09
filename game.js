@@ -538,7 +538,7 @@
   }
 
   function gameTitle() {
-    return state && state.mode === "crown" ? "Trash: Crown Debt" : "Trash Cards";
+    return state && state.mode === "crown" ? "Trash: Crown Debt" : "Classic Trash";
   }
 
   function isPlayable(card, playerIndex) {
