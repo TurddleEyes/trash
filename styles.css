@@ -304,7 +304,20 @@ button {
 .icon-button {
   width: 46px;
   flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  padding: 0;
   font-size: 1.28rem;
+  line-height: 1;
+}
+
+.icon-button > span {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  place-items: center;
+  font-size: inherit;
+  line-height: 1;
 }
 
 .audio-button {
@@ -314,7 +327,7 @@ button {
 
 .audio-button span {
   position: relative;
-  top: -1px;
+  top: 0;
 }
 
 .audio-button::after {
@@ -2362,11 +2375,11 @@ body.mobile-mode.stage-portrait .icon-button {
   width: var(--mobile-button-size);
   min-height: var(--mobile-button-size);
   border-radius: 18px;
-  font-size: 2rem;
+  font-size: calc(var(--mobile-button-size) * 0.4);
 }
 
 body.mobile-mode.stage-portrait .icon-button {
-  font-size: 1.9rem;
+  font-size: calc(var(--mobile-button-size) * 0.38);
 }
 
 body.mobile-mode.stage-landscape .header-actions {
@@ -2375,17 +2388,25 @@ body.mobile-mode.stage-landscape .header-actions {
 
 body.mobile-mode.stage-landscape .icon-button {
   border-radius: 14px;
-  font-size: 1.65rem;
+  font-size: calc(var(--mobile-button-size) * 0.43);
+}
+
+body.mobile-mode .audio-button::after {
+  left: 50%;
+  right: auto;
+  width: calc(var(--mobile-button-size) * 0.46);
+  transform: translate(-50%, -50%) rotate(-42deg);
 }
 
 body.mobile-mode.stage-landscape .card,
 body.mobile-mode.stage-landscape.fullscreen-mode .card {
-  width: min(100%, 122px);
+  width: min(100%, 110px);
   border-radius: 10px;
 }
 
 body.mobile-mode.stage-landscape .card-grid {
-  gap: 6px;
+  gap: 9px;
+  align-content: space-evenly;
 }
 
 body.mobile-mode.stage-landscape .center-play {
