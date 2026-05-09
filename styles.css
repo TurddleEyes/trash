@@ -2346,6 +2346,52 @@ body.stage-portrait .item-chip {
   font-size: 0.74rem;
 }
 
+body.mobile-mode.stage-landscape .top-bar,
+body.mobile-mode.stage-portrait .top-bar {
+  gap: 16px;
+}
+
+body.mobile-mode.stage-landscape .header-actions,
+body.mobile-mode.stage-portrait .header-actions {
+  gap: 14px;
+}
+
+body.mobile-mode.stage-landscape .icon-button,
+body.mobile-mode.stage-portrait .icon-button {
+  width: 120px;
+  min-height: 120px;
+  border-radius: 18px;
+  font-size: 2rem;
+}
+
+body.mobile-mode.stage-portrait .icon-button {
+  width: 120px;
+  min-height: 120px;
+  font-size: 1.9rem;
+}
+
+body.mobile-mode.stage-landscape .coin-strip,
+body.mobile-mode.stage-portrait .coin-strip {
+  gap: 8px;
+  padding: 8px;
+}
+
+body.mobile-mode.stage-landscape .coin-card,
+body.mobile-mode.stage-portrait .coin-card {
+  min-width: 78px;
+  padding: 9px 11px;
+}
+
+body.mobile-mode.stage-landscape .coin-strip span,
+body.mobile-mode.stage-portrait .coin-strip span {
+  font-size: 0.82rem;
+}
+
+body.mobile-mode.stage-landscape .coin-strip strong,
+body.mobile-mode.stage-portrait .coin-strip strong {
+  font-size: 1.16rem;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

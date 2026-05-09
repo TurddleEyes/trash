@@ -191,6 +191,10 @@
     const stageScale = Math.min(width / designWidth, height / designHeight);
     const stageWidth = Math.floor(designWidth * stageScale);
     const stageHeight = Math.floor(designHeight * stageScale);
+    const coarsePointer = window.matchMedia("(pointer: coarse)").matches;
+    const hoverNone = window.matchMedia("(hover: none)").matches;
+    const compactViewport = Math.min(width, height) <= 720 || Math.max(width, height) <= 1100;
+    const mobileMode = coarsePointer || hoverNone || compactViewport;
 
     document.documentElement.style.setProperty("--app-width", `${width}px`);
     document.documentElement.style.setProperty("--app-height", `${height}px`);
@@ -201,6 +205,8 @@
     document.documentElement.style.setProperty("--stage-height", `${stageHeight}px`);
     document.body.classList.toggle("stage-landscape", landscape);
     document.body.classList.toggle("stage-portrait", !landscape);
+    document.body.classList.toggle("mobile-mode", mobileMode);
+    document.body.classList.toggle("desktop-mode", !mobileMode);
   }
 
   function fullscreenElement() {
