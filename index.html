@@ -22,7 +22,7 @@
       }
 
       .mode-wrap {
-        width: min(760px, 100%) !important;
+        width: min(820px, 100%) !important;
       }
 
       .mode-heading {
@@ -37,13 +37,16 @@
         margin-bottom: 0 !important;
       }
 
-      .game-logo {
-        margin: 0 0 8px !important;
-        color: #edbd58 !important;
-        font-size: clamp(3rem, 10vw, 6.25rem) !important;
-        font-weight: 950 !important;
-        line-height: 0.86 !important;
-        text-transform: uppercase !important;
+      .logo-lockup {
+        width: clamp(220px, 38vh, 360px) !important;
+        margin: 0 0 10px !important;
+      }
+
+      .game-logo-art {
+        display: block !important;
+        width: 100% !important;
+        height: auto !important;
+        filter: drop-shadow(0 18px 28px rgba(0, 0, 0, 0.45)) !important;
       }
 
       .mode-actions {
@@ -114,14 +117,17 @@
         }
       }
     </style>
-    <link rel="stylesheet" href="styles.css?v=menu-logo-1">
+    <link rel="stylesheet" href="styles.css?v=casino-board-1">
   </head>
   <body>
     <section id="modeScreen" class="screen-overlay mode-select" aria-labelledby="modeTitle">
       <div class="mode-wrap">
         <div class="mode-heading">
           <div>
-            <p class="game-logo">Trash Cards</p>
+            <div class="logo-lockup">
+              <img class="game-logo-art" src="assets/Brand/Trash_logo.png" alt="Trash Cards" onerror="this.hidden=true; this.nextElementSibling.hidden=false;">
+              <p class="game-logo game-logo-fallback" hidden>Trash Cards</p>
+            </div>
             <h1 id="modeTitle">Choose your game</h1>
           </div>
           <div class="mode-actions">
