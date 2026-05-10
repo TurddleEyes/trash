@@ -669,6 +669,7 @@ button {
 
 .table-status {
   justify-self: center;
+  width: min(430px, 100%);
   max-width: min(430px, 100%);
   min-height: 32px;
   margin: 0;
@@ -774,7 +775,7 @@ button {
 
 .current-card:not(.empty) {
   border-color: transparent;
-  transform: translateY(-2px);
+  transform: none;
 }
 
 .pile-count {
@@ -812,7 +813,7 @@ button {
 }
 
 .current-card.empty {
-  display: none;
+  display: grid;
 }
 
 .inventory-bar {
@@ -2417,8 +2418,13 @@ body.stage-portrait .turn-pill {
 
 body.stage-landscape .table-status,
 body.stage-portrait .table-status {
+  width: min(430px, 100%);
   max-width: min(430px, 100%);
-  min-height: 32px;
+  height: 54px;
+  min-height: 54px;
+  display: grid;
+  place-items: center;
+  align-content: center;
   padding: 8px 12px;
   font-size: 0.86rem;
 }
