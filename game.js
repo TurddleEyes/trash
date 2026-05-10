@@ -118,6 +118,7 @@
     helpModal: document.getElementById("helpModal"),
     closeHelp: document.getElementById("closeHelp"),
     modeName: document.getElementById("modeName"),
+    coinStrip: document.getElementById("coinStrip"),
     botGrid: document.getElementById("botGrid"),
     humanGrid: document.getElementById("humanGrid"),
     botCoins: document.getElementById("botCoins"),
@@ -1768,7 +1769,11 @@
 
   function render() {
     if (!state) return;
+    const crownMode = isCrownMode();
     els.modeName.textContent = gameTitle();
+    els.coinStrip.hidden = !crownMode;
+    document.body.classList.toggle("crown-mode", crownMode);
+    document.body.classList.toggle("classic-mode", !crownMode);
     renderGrid(els.humanGrid, human);
     renderGrid(els.botGrid, bot);
 
