@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Testing Guide
+    url: https://github.com/TurddleEyes/trash/wiki/Testing-Guide
+    about: Read this before testing or reporting bugs.

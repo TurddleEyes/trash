@@ -13,7 +13,11 @@ Play it here:
 
 ## Wiki
 
-The game wiki lives in this repo for now:
+The main game wiki lives here:
+
+[https://github.com/TurddleEyes/trash/wiki](https://github.com/TurddleEyes/trash/wiki)
+
+A repo copy is kept here too:
 
 [docs/wiki](docs/wiki)
 
@@ -27,6 +31,11 @@ It covers:
 - Controls and audio
 - Troubleshooting
 - Roadmap ideas
+- Testing guide
 
-GitHub's formal Wiki repo has to be initialized from the website before it can be pushed to by Git. Once the first GitHub Wiki page exists, these same pages can be pushed into the real Wiki.
+## Testing
 
+Want to help break the game?
+
+- Read the [Testing Guide](https://github.com/TurddleEyes/trash/wiki/Testing-Guide).
+- Report bugs, exploits, UI problems, balance feedback, or item ideas in [GitHub Issues](https://github.com/TurddleEyes/trash/issues).

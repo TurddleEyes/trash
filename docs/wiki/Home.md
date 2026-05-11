@@ -14,6 +14,7 @@ Play the game here:
 - [Item Shop](Item-Shop.md)
 - [Coins and Scoring](Coins-and-Scoring.md)
 - [Controls and Audio](Controls-and-Audio.md)
+- [Testing Guide](Testing-Guide.md)
 - [FAQ and Troubleshooting](FAQ-and-Troubleshooting.md)
 - [Roadmap Ideas](Roadmap-Ideas.md)
 
