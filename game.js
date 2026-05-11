@@ -549,6 +549,20 @@
     return !slots[card.value - 1].up;
   }
 
+  function canPlaceHeldFor(playerIndex, index) {
+    const slot = state && state.players[playerIndex] && state.players[playerIndex].slots[index];
+    return Boolean(
+      state &&
+      !state.over &&
+      state.turn === playerIndex &&
+      state.phase === "place" &&
+      state.held &&
+      slot &&
+      state.held.value === index + 1 &&
+      isPlayable(state.held, playerIndex)
+    );
+  }
+
   function canHumanDraw() {
     return state && !state.over && state.turn === human && state.phase === "draw";
   }
@@ -608,8 +622,7 @@
   }
 
   function placeHeld(index, sourceRectOverride = null, playerIndex = human) {
-    if (state.over || state.phase !== "place" || !state.held) return;
-    if (state.held.value !== index + 1 || state.players[playerIndex].slots[index].up) return;
+    if (!canPlaceHeldFor(playerIndex, index)) return false;
 
     const sourceRect = sourceRectOverride || currentRect();
     const targetRect = cardRect(playerIndex, index);
@@ -627,7 +640,10 @@
     state.turnPlacements += 1;
     state.players[playerIndex].maxChain = Math.max(state.players[playerIndex].maxChain, state.turnPlacements);
 
-    if (checkWinner(playerIndex)) return endRound(playerIndex);
+    if (checkWinner(playerIndex)) {
+      endRound(playerIndex);
+      return true;
+    }
 
     if (playerIndex === human) {
       if (isPlayable(state.held, human)) {
@@ -640,6 +656,7 @@
     animateCard(placed, sourceRect, targetRect, "place");
     bumpElement(els.currentCard);
     playSfx("place");
+    return true;
   }
 
   function trashHeld() {
@@ -1418,6 +1435,7 @@
   }
 
   function handleItemSlot(index) {
+    if (state.turn !== human || state.over || state.phase === "waiting") return false;
     if (!state.pendingItem) return false;
     const pending = state.pendingItem;
     const slots = state.players[human].slots;
@@ -1434,7 +1452,7 @@
   }
 
   function placeWildSeal(index, itemIndex) {
-    if (state.over || state.phase !== "place" || !state.held || state.players[human].slots[index].up) return;
+    if (state.over || state.turn !== human || state.phase !== "place" || !state.held || state.players[human].slots[index].up) return;
     const sourceRect = currentRect();
     const targetRect = cardRect(human, index);
     const placed = state.held;
@@ -1469,8 +1487,9 @@
 
   function renderCard(slot, index, owner) {
     const button = document.createElement("button");
-    const itemSelectable = owner === human && state.pendingItem && !slot.up;
-    const playable = owner === human && state.phase === "place" && state.held && state.held.value === index + 1 && !slot.up;
+    const humanCanAct = owner === human && state.turn === human && !state.over && state.phase !== "waiting";
+    const itemSelectable = humanCanAct && state.pendingItem && !slot.up;
+    const playable = humanCanAct && canPlaceHeldFor(human, index);
     const visible = slot.up || slot.peeked;
     button.className = `card ${visible ? "face-up" : "face-down"}${playable ? " target" : ""}${itemSelectable ? " item-selectable" : ""}`;
     button.type = "button";
