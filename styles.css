@@ -13,6 +13,11 @@
   --red: #be2f3e;
   --blue: #1f5087;
   --gold: #edbd58;
+  --gold-soft: #f7d88d;
+  --ruby: #661b2b;
+  --mahogany: #21120d;
+  --card-depth: 0 20px 18px rgba(0, 0, 0, 0.32), 0 5px 0 rgba(0, 0, 0, 0.2);
+  --card-edge-shadow: inset 0 -5px 9px rgba(0, 0, 0, 0.12), inset 0 5px 8px rgba(255, 255, 255, 0.18);
   --edge: rgba(255, 255, 255, 0.16);
   --shadow: rgba(0, 0, 0, 0.32);
   --app-width: 100vw;
@@ -2230,6 +2235,15 @@ body.stage-portrait .game-shell {
   grid-template-rows: auto minmax(0, 1fr);
 }
 
+body.desktop-mode .game-shell,
+body.desktop-mode.fullscreen-mode .game-shell {
+  left: 0;
+  top: 0;
+  width: var(--app-width);
+  height: var(--app-height);
+  transform: none;
+}
+
 body.stage-landscape .top-bar,
 body.stage-portrait .top-bar {
   display: flex;
@@ -2548,6 +2562,17 @@ body.mobile-mode.stage-landscape .card-grid {
   align-content: space-evenly;
 }
 
+body.desktop-mode.stage-landscape .card-grid {
+  align-content: space-evenly;
+  box-sizing: border-box;
+  padding-bottom: 22px;
+}
+
+body.desktop-mode.stage-landscape .card,
+body.desktop-mode.stage-landscape.fullscreen-mode .card {
+  width: min(100%, clamp(78px, calc((var(--app-height) - 260px) / 6.8), 104px));
+}
+
 body.mobile-mode.stage-landscape .center-play {
   grid-template-rows: auto auto auto 124px auto;
 }
@@ -2595,6 +2620,461 @@ body.mobile-mode.stage-portrait .coin-strip span {
 body.mobile-mode.stage-landscape .coin-strip strong,
 body.mobile-mode.stage-portrait .coin-strip strong {
   font-size: 1.16rem;
+}
+
+/* Casino 2.5D table pass. Kept CSS-only so card logic and drag targets stay stable. */
+.table-surface {
+  perspective: 1400px;
+  transform-style: preserve-3d;
+  border-color: rgba(247, 216, 141, 0.5);
+  background:
+    radial-gradient(ellipse at 50% 44%, rgba(255, 255, 255, 0.12), transparent 38%),
+    radial-gradient(ellipse at 50% 108%, rgba(102, 27, 43, 0.28), transparent 42%),
+    linear-gradient(115deg, rgba(255, 255, 255, 0.06) 0 1px, transparent 1px 34px),
+    linear-gradient(65deg, rgba(0, 0, 0, 0.16) 0 1px, transparent 1px 34px),
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.035) 0 1px, transparent 1px 42px),
+    linear-gradient(145deg, #11815e, #095d48 46%, #05382f);
+  box-shadow:
+    inset 0 0 0 8px rgba(12, 8, 5, 0.92),
+    inset 0 0 0 14px rgba(104, 60, 25, 0.9),
+    inset 0 0 0 19px rgba(247, 216, 141, 0.34),
+    inset 0 0 0 28px rgba(1, 18, 16, 0.28),
+    inset 0 28px 90px rgba(255, 245, 197, 0.11),
+    inset 0 -38px 110px rgba(0, 0, 0, 0.42),
+    0 34px 0 rgba(18, 10, 7, 0.72),
+    0 50px 95px rgba(0, 0, 0, 0.4);
+}
+
+.table-surface::before {
+  inset: 16px;
+  border-color: rgba(247, 216, 141, 0.52);
+  box-shadow:
+    inset 0 0 0 2px rgba(255, 255, 255, 0.08),
+    inset 0 0 0 8px rgba(73, 34, 16, 0.38),
+    inset 0 0 46px rgba(0, 0, 0, 0.28);
+}
+
+.table-surface::after {
+  inset: 34px 42px;
+  border-color: rgba(247, 216, 141, 0.18);
+  background:
+    radial-gradient(ellipse at center, transparent 54%, rgba(247, 216, 141, 0.08) 55%, transparent 66%),
+    linear-gradient(90deg, transparent, rgba(247, 216, 141, 0.1), transparent),
+    linear-gradient(0deg, transparent 46%, rgba(255, 255, 255, 0.06) 50%, transparent 54%);
+  opacity: 0.82;
+}
+
+.table {
+  transform-style: preserve-3d;
+}
+
+.player-panel,
+.center-play {
+  transform-style: preserve-3d;
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.07), transparent 26%),
+    radial-gradient(ellipse at 50% 0%, rgba(247, 216, 141, 0.07), transparent 54%),
+    rgba(2, 20, 18, 0.42);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.07),
+    inset 0 14px 38px rgba(255, 255, 255, 0.04),
+    inset 0 -18px 48px rgba(0, 0, 0, 0.24),
+    0 18px 28px rgba(0, 0, 0, 0.24);
+}
+
+.player-panel::before,
+.center-play::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.09), transparent 32%, rgba(0, 0, 0, 0.14));
+  mix-blend-mode: screen;
+  opacity: 0.56;
+}
+
+.player-line,
+.card-grid,
+.turn-pill,
+.table-status,
+.piles-row,
+.current-card,
+.inventory-bar {
+  position: relative;
+  z-index: 2;
+}
+
+.card {
+  transform: translateZ(10px) rotateX(0deg);
+  transform-origin: center 72%;
+  border-radius: 10px;
+  box-shadow: var(--card-depth);
+  transition:
+    transform 220ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    box-shadow 220ms ease,
+    filter 220ms ease;
+}
+
+.card::before,
+.mini-card::before,
+.drag-card::before,
+.fly-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.32), transparent 30%),
+    linear-gradient(315deg, rgba(0, 0, 0, 0.16), transparent 42%);
+  opacity: 0.72;
+  z-index: 0;
+}
+
+.card::after,
+.mini-card::after,
+.drag-card::after,
+.fly-card::after {
+  content: "";
+  position: absolute;
+  inset: 3px;
+  border-radius: 8px;
+  pointer-events: none;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  box-shadow: inset 0 -5px 8px rgba(0, 0, 0, 0.12);
+  z-index: 1;
+}
+
+.card.face-down {
+  background:
+    linear-gradient(45deg, rgba(255, 255, 255, 0.16) 25%, transparent 25% 50%, rgba(255, 255, 255, 0.16) 50% 75%, transparent 75%),
+    radial-gradient(circle at 30% 20%, rgba(255, 255, 255, 0.12), transparent 34%),
+    linear-gradient(145deg, #2f68aa, #17396f 58%, #10244f);
+  box-shadow:
+    inset 0 0 0 2px rgba(255, 255, 255, 0.26),
+    inset 0 -8px 16px rgba(0, 0, 0, 0.22),
+    var(--card-depth);
+}
+
+.card.face-up {
+  background:
+    radial-gradient(circle at 28% 18%, rgba(255, 255, 255, 0.92), transparent 32%),
+    linear-gradient(145deg, rgba(255, 255, 255, 0.98), rgba(255, 248, 232, 0.96) 62%, rgba(230, 216, 188, 0.98)),
+    var(--card);
+  box-shadow:
+    inset 0 0 0 1px rgba(29, 35, 34, 0.14),
+    var(--card-edge-shadow),
+    var(--card-depth);
+}
+
+.card:not(:disabled):hover {
+  transform: translateZ(18px) translateY(-3px) rotateX(-4deg);
+  box-shadow:
+    0 28px 28px rgba(0, 0, 0, 0.38),
+    0 7px 0 rgba(0, 0, 0, 0.18);
+}
+
+.card.target {
+  transform: translateZ(24px) translateY(-7px) rotateX(-5deg);
+  box-shadow:
+    0 0 0 3px rgba(247, 216, 141, 0.96),
+    0 0 30px rgba(237, 189, 88, 0.34),
+    0 31px 32px rgba(0, 0, 0, 0.42);
+}
+
+.card.drop-hot {
+  transform: translateZ(30px) translateY(-9px) rotateX(-6deg);
+}
+
+.card .rank,
+.card .suit,
+.slot-number {
+  z-index: 4;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+.pile,
+.current-card {
+  transform-style: preserve-3d;
+  overflow: visible;
+}
+
+.pile {
+  border-color: rgba(247, 216, 141, 0.28);
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.13), rgba(255, 255, 255, 0.03)),
+    rgba(9, 29, 25, 0.45);
+  box-shadow:
+    inset 0 0 0 1px rgba(247, 216, 141, 0.08),
+    inset 0 -12px 18px rgba(0, 0, 0, 0.19),
+    0 18px 26px rgba(0, 0, 0, 0.28);
+}
+
+.pile-label,
+.pile-count {
+  position: relative;
+  z-index: 6;
+}
+
+.deck-pile {
+  transform: translateZ(12px);
+  background:
+    repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.17) 0 6px, transparent 6px 12px),
+    radial-gradient(circle at 26% 18%, rgba(255, 255, 255, 0.14), transparent 30%),
+    linear-gradient(145deg, #326caf, #17396f 58%, #10244f);
+  box-shadow:
+    4px 4px 0 #0c244d,
+    8px 8px 0 #09203f,
+    12px 12px 0 rgba(0, 0, 0, 0.38),
+    0 28px 34px rgba(0, 0, 0, 0.42),
+    inset 0 0 0 2px rgba(255, 255, 255, 0.22);
+}
+
+.deck-pile::before {
+  content: "";
+  position: absolute;
+  inset: -7px -7px auto auto;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  background:
+    repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0 6px, transparent 6px 12px),
+    linear-gradient(145deg, #244f86, #122c5d);
+  transform: translateZ(-12px);
+  z-index: -1;
+  box-shadow: 0 14px 22px rgba(0, 0, 0, 0.25);
+}
+
+.deck-pile:not(:disabled):hover,
+.draw-source.deck-pile {
+  transform: translateZ(20px) translateY(-4px) rotateX(-3deg);
+}
+
+.discard-pile {
+  transform: translateZ(8px);
+}
+
+.mini-card {
+  position: relative;
+  overflow: hidden;
+  transform: translateZ(18px);
+  box-shadow:
+    inset 0 0 0 1px rgba(29, 35, 34, 0.12),
+    var(--card-edge-shadow),
+    0 20px 22px rgba(0, 0, 0, 0.34);
+}
+
+.discard-pile .mini-card {
+  transform: translateZ(20px) rotateZ(-1deg);
+}
+
+.current-card:not(.empty) .mini-card {
+  animation: cardSettle3d 280ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.current-card.empty .mini-card {
+  transform: translateZ(1px);
+  border: 1px dashed rgba(247, 216, 141, 0.28);
+}
+
+.fly-card,
+.drag-card {
+  border-radius: 10px;
+  transform-style: preserve-3d;
+  box-shadow:
+    inset 0 0 0 1px rgba(29, 35, 34, 0.14),
+    var(--card-edge-shadow),
+    0 28px 42px rgba(0, 0, 0, 0.45);
+}
+
+.drag-card {
+  transform: translate(-50%, -50%) translateZ(80px) rotateX(-8deg) rotateZ(2deg);
+}
+
+.drag-card.back {
+  box-shadow:
+    0 32px 42px rgba(0, 0, 0, 0.48),
+    inset 0 0 0 2px rgba(255, 255, 255, 0.24);
+}
+
+.dragging-source {
+  opacity: 0.56;
+  transform: translateZ(2px) scale(0.97);
+  filter: brightness(0.82);
+}
+
+.turn-pill {
+  box-shadow:
+    inset 0 0 0 1px rgba(247, 216, 141, 0.6),
+    inset 0 8px 14px rgba(255, 255, 255, 0.06),
+    0 14px 18px rgba(0, 0, 0, 0.28);
+}
+
+.table-status {
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.05),
+    0 14px 24px rgba(0, 0, 0, 0.22);
+}
+
+body.stage-landscape .table-surface,
+body.stage-portrait .table-surface,
+.fullscreen-mode .table-surface {
+  box-shadow:
+    inset 0 0 0 8px rgba(12, 8, 5, 0.92),
+    inset 0 0 0 14px rgba(104, 60, 25, 0.9),
+    inset 0 0 0 19px rgba(247, 216, 141, 0.34),
+    inset 0 0 0 28px rgba(1, 18, 16, 0.28),
+    inset 0 28px 90px rgba(255, 245, 197, 0.11),
+    inset 0 -38px 110px rgba(0, 0, 0, 0.42),
+    0 34px 0 rgba(18, 10, 7, 0.72),
+    0 50px 95px rgba(0, 0, 0, 0.4);
+}
+
+@keyframes cardSettle3d {
+  from {
+    opacity: 0;
+    transform: translateZ(36px) translateY(9px) rotateX(18deg) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateZ(18px) translateY(0) rotateX(0deg) scale(1);
+  }
+}
+
+@keyframes bump {
+  0%,
+  100% {
+    transform: translateZ(10px) scale(1);
+  }
+  45% {
+    transform: translateZ(26px) scale(1.045);
+  }
+}
+
+/* 2.5D correction: calmer casino felt, less checker/glass noise. */
+.table-surface {
+  border-color: rgba(237, 189, 88, 0.46);
+  background:
+    radial-gradient(ellipse at 50% 28%, rgba(255, 246, 190, 0.12), transparent 30%),
+    radial-gradient(ellipse at 50% 105%, rgba(0, 0, 0, 0.36), transparent 44%),
+    linear-gradient(145deg, #0f7356 0%, #0a5a46 42%, #063d36 100%);
+  background-size: auto;
+  box-shadow:
+    inset 0 0 0 7px rgba(12, 8, 5, 0.95),
+    inset 0 0 0 13px rgba(92, 50, 22, 0.92),
+    inset 0 0 0 17px rgba(237, 189, 88, 0.34),
+    inset 0 0 0 24px rgba(2, 18, 16, 0.34),
+    inset 0 22px 76px rgba(255, 245, 197, 0.08),
+    inset 0 -34px 96px rgba(0, 0, 0, 0.42),
+    0 18px 0 rgba(31, 17, 9, 0.92),
+    0 38px 80px rgba(0, 0, 0, 0.38);
+}
+
+.table-surface::before {
+  inset: 16px;
+  border-color: rgba(237, 189, 88, 0.34);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.08),
+    inset 0 0 34px rgba(0, 0, 0, 0.28);
+}
+
+.table-surface::after {
+  inset: 42px 58px;
+  border-color: rgba(237, 189, 88, 0.14);
+  background:
+    radial-gradient(ellipse at center, transparent 55%, rgba(237, 189, 88, 0.06) 56%, transparent 67%);
+  opacity: 0.55;
+}
+
+.player-panel,
+.center-play {
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.045), transparent 28%),
+    rgba(2, 22, 20, 0.24);
+  border-color: rgba(237, 189, 88, 0.13);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.05),
+    inset 0 -18px 42px rgba(0, 0, 0, 0.18),
+    0 14px 26px rgba(0, 0, 0, 0.18);
+}
+
+.player-panel::before,
+.center-play::before {
+  opacity: 0.18;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.08), transparent 42%);
+  mix-blend-mode: normal;
+}
+
+.center-play {
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.04), transparent 30%),
+    rgba(4, 25, 24, 0.3);
+}
+
+.card::before,
+.mini-card::before,
+.drag-card::before,
+.fly-card::before {
+  opacity: 0.34;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.26), transparent 31%),
+    linear-gradient(315deg, rgba(0, 0, 0, 0.12), transparent 46%);
+}
+
+.card.face-down {
+  background:
+    linear-gradient(45deg, rgba(255, 255, 255, 0.13) 25%, transparent 25% 50%, rgba(255, 255, 255, 0.13) 50% 75%, transparent 75%),
+    linear-gradient(145deg, #2c62a2, #17376d 62%, #10254f);
+  background-size: 16px 16px, auto;
+}
+
+.card.face-up,
+.mini-card {
+  background:
+    radial-gradient(circle at 28% 18%, rgba(255, 255, 255, 0.78), transparent 32%),
+    linear-gradient(145deg, #fffdf6, #fbf0da 64%, #e7d9bd);
+}
+
+.deck-pile {
+  background:
+    repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.15) 0 6px, transparent 6px 12px),
+    linear-gradient(145deg, #2c62a2, #17376d 62%, #10254f);
+  box-shadow:
+    3px 3px 0 #0c244d,
+    6px 6px 0 #09203f,
+    9px 9px 0 rgba(0, 0, 0, 0.32),
+    0 22px 30px rgba(0, 0, 0, 0.34),
+    inset 0 0 0 2px rgba(255, 255, 255, 0.2);
+}
+
+.deck-pile::before {
+  opacity: 0.72;
+}
+
+.pile,
+.current-card {
+  border-color: rgba(237, 189, 88, 0.24);
+}
+
+.pile::after {
+  content: none;
+  display: none;
+}
+
+body.stage-landscape .table-surface,
+body.stage-portrait .table-surface,
+.fullscreen-mode .table-surface {
+  background-size: auto;
+  box-shadow:
+    inset 0 0 0 7px rgba(12, 8, 5, 0.95),
+    inset 0 0 0 13px rgba(92, 50, 22, 0.92),
+    inset 0 0 0 17px rgba(237, 189, 88, 0.34),
+    inset 0 0 0 24px rgba(2, 18, 16, 0.34),
+    inset 0 22px 76px rgba(255, 245, 197, 0.08),
+    inset 0 -34px 96px rgba(0, 0, 0, 0.42),
+    0 18px 0 rgba(31, 17, 9, 0.92),
+    0 38px 80px rgba(0, 0, 0, 0.38);
 }
 
 @media (prefers-reduced-motion: reduce) {
