@@ -106,6 +106,60 @@
     shop: 0.45,
     victory: 0.58
   };
+  const RELEASES_URL = "https://api.github.com/repos/TurddleEyes/trash/releases?per_page=6";
+  const RELEASE_FALLBACKS = [
+    {
+      name: "v0.2.5 - In-Game Release Notes",
+      tag_name: "v0.2.5",
+      published_at: "2026-05-12T00:00:00Z",
+      html_url: "https://github.com/TurddleEyes/trash/releases/tag/v0.2.5",
+      body: [
+        "## Highlights",
+        "- Moved the how-to-play question button into a floating bottom-right control.",
+        "- Added a Recent releases button to the main menu.",
+        "- Added a top-right version button in the game header.",
+        "- Added an in-game release notes modal that loads GitHub Releases when online.",
+        "- Added built-in fallback notes so local and offline browser play still shows recent updates."
+      ].join("\n")
+    },
+    {
+      name: "v0.2.4 - Casino Table Layout",
+      tag_name: "v0.2.4",
+      published_at: "2026-05-12T00:00:00Z",
+      html_url: "https://github.com/TurddleEyes/trash/releases/tag/v0.2.4",
+      body: [
+        "## Highlights",
+        "- Added the first CSS-only casino table pass with warmer felt, rail depth, card depth, and cleaner card shadows.",
+        "- Fixed blurry desktop text by letting desktop layouts use the actual browser size instead of scaling a 1920x1080 stage.",
+        "- Fixed short desktop windows so bottom-row cards keep space above the table rail.",
+        "- Kept mobile and fullscreen layouts on the fixed 16:9 or 9:16 stage system for steadier phone sizing."
+      ].join("\n")
+    },
+    {
+      name: "v0.2.3 - Lock Card Placement",
+      tag_name: "v0.2.3",
+      published_at: "2026-05-11T00:00:00Z",
+      html_url: "https://github.com/TurddleEyes/trash/releases/tag/v0.2.3",
+      body: [
+        "## Highlights",
+        "- Locked card placement to the active player.",
+        "- Stopped fast human input from stealing cards while the bot is playing.",
+        "- Kept the current-card tray stable during turns."
+      ].join("\n")
+    },
+    {
+      name: "v0.2.2 - Current Card Tray",
+      tag_name: "v0.2.2",
+      published_at: "2026-05-10T00:00:00Z",
+      html_url: "https://github.com/TurddleEyes/trash/releases/tag/v0.2.2",
+      body: [
+        "## Highlights",
+        "- Gave the current card a permanent home.",
+        "- Improved mobile and desktop table spacing.",
+        "- Cleaned up classic mode so coins stay in Crown Debt."
+      ].join("\n")
+    }
+  ];
 
   const els = {
     modeScreen: document.getElementById("modeScreen"),
@@ -117,6 +171,10 @@
     helpButton: document.getElementById("helpButton"),
     helpModal: document.getElementById("helpModal"),
     closeHelp: document.getElementById("closeHelp"),
+    releaseButtons: document.querySelectorAll("[data-release-button]"),
+    releaseModal: document.getElementById("releaseModal"),
+    releaseList: document.getElementById("releaseList"),
+    closeRelease: document.getElementById("closeRelease"),
     modeName: document.getElementById("modeName"),
     coinStrip: document.getElementById("coinStrip"),
     botGrid: document.getElementById("botGrid"),
@@ -159,6 +217,7 @@
   let suppressClick = false;
   let modalAction = null;
   let fallbackFullscreen = false;
+  let releasesLoaded = false;
   const audioState = {
     musicEnabled: false,
     sfxEnabled: false,
@@ -1318,6 +1377,7 @@
 
   function hideAllModals() {
     els.helpModal.classList.add("hidden");
+    els.releaseModal.classList.add("hidden");
     els.roundModal.classList.add("hidden");
     els.discardModal.classList.add("hidden");
     els.shopModal.classList.add("hidden");
@@ -1325,6 +1385,133 @@
 
   function showHelp() {
     els.helpModal.classList.remove("hidden");
+  }
+
+  function showReleases() {
+    els.releaseModal.classList.remove("hidden");
+    if (!releasesLoaded) {
+      releasesLoaded = true;
+      loadReleases();
+    }
+  }
+
+  async function loadReleases() {
+    renderReleaseStatus("Loading recent releases...");
+    try {
+      const response = await fetch(RELEASES_URL, { headers: { Accept: "application/vnd.github+json" } });
+      if (!response.ok) throw new Error(`Release request failed with ${response.status}`);
+      const releases = await response.json();
+      renderReleases(Array.isArray(releases) && releases.length ? releases : RELEASE_FALLBACKS);
+    } catch (error) {
+      renderReleases(RELEASE_FALLBACKS, "Showing built-in release notes. Live GitHub releases could not be loaded.");
+    }
+  }
+
+  function renderReleaseStatus(message) {
+    const item = document.createElement("div");
+    item.className = "release-item";
+    const paragraph = document.createElement("p");
+    paragraph.textContent = message;
+    item.appendChild(paragraph);
+    els.releaseList.replaceChildren(item);
+  }
+
+  function renderReleases(releases, notice = "") {
+    const nodes = [];
+    if (notice) {
+      const item = document.createElement("div");
+      item.className = "release-item";
+      const paragraph = document.createElement("p");
+      paragraph.textContent = notice;
+      item.appendChild(paragraph);
+      nodes.push(item);
+    }
+    releases.slice(0, 6).forEach((release) => nodes.push(releaseCard(release)));
+    els.releaseList.replaceChildren(...nodes);
+  }
+
+  function releaseCard(release) {
+    const item = document.createElement("article");
+    item.className = "release-item";
+
+    const title = document.createElement("h3");
+    title.textContent = release.name || release.tag_name || "Release";
+    item.appendChild(title);
+
+    const meta = document.createElement("div");
+    meta.className = "release-meta";
+    const tag = document.createElement("span");
+    tag.textContent = release.tag_name || "version";
+    meta.appendChild(tag);
+    const published = release.published_at || release.created_at;
+    if (published) {
+      const date = document.createElement("span");
+      date.textContent = formatReleaseDate(published);
+      meta.appendChild(date);
+    }
+    item.appendChild(meta);
+
+    const body = document.createElement("div");
+    body.className = "release-body";
+    renderReleaseBody(body, release.body || "No release notes yet.", release.name || release.tag_name);
+    item.appendChild(body);
+
+    if (release.html_url) {
+      const link = document.createElement("a");
+      link.className = "release-link";
+      link.href = release.html_url;
+      link.target = "_blank";
+      link.rel = "noopener";
+      link.textContent = "View on GitHub";
+      item.appendChild(link);
+    }
+
+    return item;
+  }
+
+  function renderReleaseBody(container, bodyText, releaseTitle = "") {
+    let list = null;
+    bodyText.split(/\r?\n/).map((line) => line.trim()).filter(Boolean).forEach((line, index) => {
+      if (index === 0 && releaseTitle && line.toLowerCase() === releaseTitle.toLowerCase()) return;
+
+      if (line.startsWith("## ")) {
+        list = null;
+        const heading = document.createElement("h4");
+        heading.textContent = line.slice(3);
+        container.appendChild(heading);
+        return;
+      }
+
+      if (/^[A-Za-z ]+:$/.test(line)) {
+        list = null;
+        const heading = document.createElement("h4");
+        heading.textContent = line.slice(0, -1);
+        container.appendChild(heading);
+        return;
+      }
+
+      if (line.startsWith("- ")) {
+        if (!list) {
+          list = document.createElement("ul");
+          container.appendChild(list);
+        }
+        const point = document.createElement("li");
+        point.textContent = line.slice(2);
+        list.appendChild(point);
+        return;
+      }
+
+      list = null;
+      const paragraph = document.createElement("p");
+      paragraph.textContent = line.replace(/^#+\s*/, "");
+      container.appendChild(paragraph);
+    });
+  }
+
+  function formatReleaseDate(value) {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return value;
+    return date.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
   }
 
   function showModeSelect() {
@@ -1842,6 +2029,8 @@
   els.sfxButton.addEventListener("click", toggleSfx);
   els.helpButton.addEventListener("click", showHelp);
   els.closeHelp.addEventListener("click", () => els.helpModal.classList.add("hidden"));
+  els.releaseButtons.forEach((button) => button.addEventListener("click", showReleases));
+  els.closeRelease.addEventListener("click", () => els.releaseModal.classList.add("hidden"));
   els.deckPile.addEventListener("pointerdown", (event) => beginPileDrag(event, "deck"));
   els.discardPile.addEventListener("pointerdown", (event) => beginPileDrag(event, "discard"));
   els.currentCard.querySelector(".mini-card").addEventListener("pointerdown", beginHeldDrag);
