@@ -107,8 +107,22 @@
     victory: 0.58
   };
   const SFX_POOL_SIZE = 4;
+  const PITCHED_SFX = new Set(["draw", "place", "discard"]);
+  const CARD_SFX_PITCH_VARIANCE = 0.045;
   const RELEASES_URL = "https://api.github.com/repos/TurddleEyes/trash/releases?per_page=6";
   const RELEASE_FALLBACKS = [
+    {
+      name: "v0.2.7 - Subtle Card Pitch Variety",
+      tag_name: "v0.2.7",
+      published_at: "2026-05-14T00:00:00Z",
+      html_url: "https://github.com/TurddleEyes/trash/releases/tag/v0.2.7",
+      body: [
+        "## Highlights",
+        "- Added subtle random pitch variation to card draw, place, and discard sounds.",
+        "- Kept shop, music, and victory audio at normal pitch.",
+        "- Limited the pitch range so the card sound stays natural and does not distort."
+      ].join("\n")
+    },
     {
       name: "v0.2.6 - Faster SFX and Link Previews",
       tag_name: "v0.2.6",
@@ -509,6 +523,22 @@
     if (audioState.sfxEnabled) unlockAudio();
   }
 
+  function sfxPlaybackRate(name) {
+    if (!PITCHED_SFX.has(name)) return 1;
+    return 1 + (Math.random() * 2 - 1) * CARD_SFX_PITCH_VARIANCE;
+  }
+
+  function applyAudioPitch(clip, rate) {
+    try {
+      clip.playbackRate = rate;
+      clip.preservesPitch = false;
+      clip.mozPreservesPitch = false;
+      clip.webkitPreservesPitch = false;
+    } catch (error) {
+      // Pitch changes are best effort on older mobile browsers.
+    }
+  }
+
   function playSfx(name) {
     if (!audioState.sfxEnabled) return;
     initAudio();
@@ -517,10 +547,12 @@
     const src = AUDIO_FILES[name];
     const context = audioContext();
     const buffer = src && audioState.sfxBuffers[src];
+    const rate = sfxPlaybackRate(name);
     if (context && buffer) {
       const source = context.createBufferSource();
       const gain = context.createGain();
       source.buffer = buffer;
+      source.playbackRate.value = rate;
       gain.gain.value = AUDIO_VOLUMES[name] || 0.5;
       source.connect(gain);
       gain.connect(context.destination);
@@ -538,6 +570,7 @@
     } catch (error) {
       // The fallback audio tag may be locked until the next user gesture.
     }
+    applyAudioPitch(clip, rate);
     clip.volume = AUDIO_VOLUMES[name] || 0.5;
     clip.play().catch(() => {});
   }
