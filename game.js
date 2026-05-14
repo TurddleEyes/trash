@@ -106,8 +106,22 @@
     shop: 0.45,
     victory: 0.58
   };
+  const SFX_POOL_SIZE = 4;
   const RELEASES_URL = "https://api.github.com/repos/TurddleEyes/trash/releases?per_page=6";
   const RELEASE_FALLBACKS = [
+    {
+      name: "v0.2.6 - Faster SFX and Link Previews",
+      tag_name: "v0.2.6",
+      published_at: "2026-05-14T00:00:00Z",
+      html_url: "https://github.com/TurddleEyes/trash/releases/tag/v0.2.6",
+      body: [
+        "## Highlights",
+        "- Warmed up sound effects after the first tap so card sounds respond faster after quiet moments.",
+        "- Added a small SFX pool and Web Audio playback path for repeated card sounds.",
+        "- Added Discord, Twitter, and Open Graph preview metadata for shared game links.",
+        "- Added a canonical URL, theme color, and favicon metadata."
+      ].join("\n")
+    },
     {
       name: "v0.2.5 - In-Game Release Notes",
       tag_name: "v0.2.5",
@@ -226,7 +240,11 @@
     currentMusicSrc: "",
     failedMusicTracks: new Set(),
     music: null,
-    sfx: {}
+    sfx: {},
+    audioContext: null,
+    unlocked: false,
+    sfxBuffers: {},
+    sfxBufferPromises: {}
   };
 
   try {
@@ -286,6 +304,11 @@
     return audio;
   }
 
+  function makeSfxPool(name) {
+    const count = name === "draw" || name === "place" || name === "discard" ? SFX_POOL_SIZE : 2;
+    return Array.from({ length: count }, () => makeAudio(AUDIO_FILES[name], false, AUDIO_VOLUMES[name]));
+  }
+
   function normalizeMusicTrack(src) {
     const track = src.trim();
     if (/^(https?:)?\/\//.test(track) || track.startsWith("/") || track.startsWith("assets/")) return track;
@@ -305,9 +328,94 @@
     audioState.musicTracks = configuredMusicTracks();
     Object.keys(AUDIO_FILES).forEach((key) => {
       if (key === "music" || !AUDIO_FILES[key]) return;
-      audioState.sfx[key] = makeAudio(AUDIO_FILES[key], false, AUDIO_VOLUMES[key]);
+      audioState.sfx[key] = makeSfxPool(key);
     });
     audioState.initialized = true;
+  }
+
+  function audioContext() {
+    if (audioState.audioContext) return audioState.audioContext;
+    const Context = window.AudioContext || window.webkitAudioContext;
+    if (!Context) return null;
+    try {
+      audioState.audioContext = new Context();
+    } catch (error) {
+      audioState.audioContext = null;
+    }
+    return audioState.audioContext;
+  }
+
+  function resumeAudioContext() {
+    const context = audioContext();
+    if (!context) return;
+    if (context.state === "suspended" && typeof context.resume === "function") {
+      context.resume().catch(() => {});
+    }
+  }
+
+  function decodeAudio(context, data) {
+    return new Promise((resolve, reject) => {
+      const copy = data.slice(0);
+      const done = (buffer) => resolve(buffer);
+      const fail = () => reject(new Error("Audio decode failed"));
+      const result = context.decodeAudioData(copy, done, fail);
+      if (result && typeof result.then === "function") result.then(done).catch(fail);
+    });
+  }
+
+  function loadSfxBuffer(name) {
+    const src = AUDIO_FILES[name];
+    const context = audioContext();
+    if (!src || !context || typeof fetch !== "function") return null;
+    if (audioState.sfxBuffers[src]) return Promise.resolve(audioState.sfxBuffers[src]);
+    if (audioState.sfxBufferPromises[src]) return audioState.sfxBufferPromises[src];
+
+    audioState.sfxBufferPromises[src] = fetch(src)
+      .then((response) => {
+        if (!response.ok) throw new Error("SFX fetch failed");
+        return response.arrayBuffer();
+      })
+      .then((data) => decodeAudio(context, data))
+      .then((buffer) => {
+        audioState.sfxBuffers[src] = buffer;
+        return buffer;
+      })
+      .catch(() => null);
+    return audioState.sfxBufferPromises[src];
+  }
+
+  function warmSfx() {
+    if (!audioState.sfxEnabled) return;
+    initAudio();
+    resumeAudioContext();
+    Object.keys(audioState.sfx).forEach((name) => {
+      audioState.sfx[name].forEach((clip) => {
+        try {
+          clip.load();
+        } catch (error) {
+          // Some mobile browsers ignore manual SFX preloads.
+        }
+      });
+      loadSfxBuffer(name);
+    });
+  }
+
+  function unlockAudio() {
+    initAudio();
+    resumeAudioContext();
+    const context = audioContext();
+    if (context && !audioState.unlocked) {
+      try {
+        const source = context.createBufferSource();
+        source.buffer = context.createBuffer(1, 1, context.sampleRate);
+        source.connect(context.destination);
+        source.start(0);
+        audioState.unlocked = true;
+      } catch (error) {
+        audioState.unlocked = false;
+      }
+    }
+    warmSfx();
   }
 
   function saveAudioPreference() {
@@ -398,15 +506,39 @@
     audioState.sfxEnabled = !audioState.sfxEnabled;
     saveAudioPreference();
     syncAudioUi();
+    if (audioState.sfxEnabled) unlockAudio();
   }
 
   function playSfx(name) {
     if (!audioState.sfxEnabled) return;
     initAudio();
-    const base = audioState.sfx[name];
-    if (!base) return;
-    const clip = base.cloneNode(true);
-    clip.volume = base.volume;
+    resumeAudioContext();
+
+    const src = AUDIO_FILES[name];
+    const context = audioContext();
+    const buffer = src && audioState.sfxBuffers[src];
+    if (context && buffer) {
+      const source = context.createBufferSource();
+      const gain = context.createGain();
+      source.buffer = buffer;
+      gain.gain.value = AUDIO_VOLUMES[name] || 0.5;
+      source.connect(gain);
+      gain.connect(context.destination);
+      source.start(0);
+      return;
+    }
+
+    loadSfxBuffer(name);
+    const pool = audioState.sfx[name];
+    if (!pool || !pool.length) return;
+    const clip = pool.find((candidate) => candidate.paused || candidate.ended) || pool[0];
+    try {
+      clip.pause();
+      clip.currentTime = 0;
+    } catch (error) {
+      // The fallback audio tag may be locked until the next user gesture.
+    }
+    clip.volume = AUDIO_VOLUMES[name] || 0.5;
     clip.play().catch(() => {});
   }
 
@@ -489,6 +621,7 @@
   }
 
   function startMatch(mode) {
+    unlockAudio();
     state = {
       mode,
       round: 1,
@@ -2055,6 +2188,9 @@
     state.pendingPurchase = null;
     state.shopOffers = [];
     continueToNextRound();
+  });
+  ["pointerdown", "touchstart", "keydown"].forEach((eventName) => {
+    document.addEventListener(eventName, unlockAudio, { once: true, passive: true });
   });
 
   window.addEventListener("resize", setAppHeight);
