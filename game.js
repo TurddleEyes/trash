@@ -114,6 +114,19 @@
   const PERFORMANCE_STORAGE_KEY = "trashCardsPerformanceMode";
   const RELEASE_FALLBACKS = [
     {
+      name: "v0.2.8 - Online Rooms Start",
+      tag_name: "v0.2.8",
+      published_at: "2026-05-20T00:00:00Z",
+      body: [
+        "## Highlights",
+        "- Online rooms now start the player match when both players are ready.",
+        "- Added seeded online match setup so both players share the same opening table.",
+        "- Added core online draw, place, and discard action syncing through the room socket.",
+        "- Fixed the main menu shine so it stays inside the mode cards.",
+        "- Kept server URL controls and external release links out of the player-facing UI."
+      ].join("\n")
+    },
+    {
       name: "v0.2.7 - Subtle Card Pitch Variety",
       tag_name: "v0.2.7",
       published_at: "2026-05-14T00:00:00Z",
