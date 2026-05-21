@@ -22,7 +22,20 @@
       name: "Lucky Match",
       cost: 6,
       tier: "common",
-      text: "Flip one hidden card that is already in its correct slot."
+      text: "Flip one hidden card. If it belongs there, keep it face-up."
+    },
+    bottomDeal: {
+      name: "Bottom Deal",
+      cost: 5,
+      tier: "common",
+      text: "Before drawing, draw from the bottom of the deck instead."
+    },
+    insuranceFraud: {
+      name: "Insurance Fraud",
+      cost: 4,
+      tier: "common",
+      shopUse: true,
+      text: "Pay 1 coin now. If you lose next round, gain 3 bonus coins."
     },
     pardon: {
       name: "Royal Pardon",
@@ -49,17 +62,37 @@
       shopUse: true,
       text: "Steal up to 3 coins from the opponent between rounds."
     },
-    sabotage: {
-      name: "Sabotage",
-      cost: 12,
-      tier: "rare",
-      text: "Flip one random opponent placed card back face-down."
+    riggedDiscard: {
+      name: "Rigged Discard",
+      cost: 8,
+      tier: "uncommon",
+      text: "Put your current card on the discard pile and draw again."
+    },
+    blackMarket: {
+      name: "Black Market",
+      cost: 9,
+      tier: "uncommon",
+      shopUse: true,
+      text: "Refresh this shop once with better rarity odds."
+    },
+    doubleDown: {
+      name: "Double Down",
+      cost: 10,
+      tier: "uncommon",
+      shopUse: true,
+      text: "Win next round for +5 coins. Lose and gain no round coins."
     },
     chaosCut: {
       name: "Chaos Cut",
       cost: 11,
       tier: "rare",
       text: "Shuffle every face-down card on both boards."
+    },
+    mirrorCurse: {
+      name: "Mirror Curse",
+      cost: 12,
+      tier: "rare",
+      text: "Both players flip one random completed slot face-down."
     },
     shield: {
       name: "Crown Shield",
@@ -71,7 +104,20 @@
       name: "Wild Seal",
       cost: 12,
       tier: "rare",
-      text: "Place one face card into any empty slot."
+      text: "Treat one face card as a number 1-5 once."
+    },
+    debtSwap: {
+      name: "Debt Swap",
+      cost: 13,
+      tier: "rare",
+      shopUse: true,
+      text: "If behind by 2+ cards, swap board sizes next round only."
+    },
+    royalGambit: {
+      name: "Royal Gambit",
+      cost: 12,
+      tier: "rare",
+      text: "Guess a slot before drawing. If the top card matches, place it."
     },
     debt: {
       name: "Debt of the Crown",
@@ -79,16 +125,42 @@
       tier: "legendary",
       legendary: true,
       text: "Opponent adds 1 required card next round. Rare after round 3."
+    },
+    jokersFavor: {
+      name: "Joker's Favor",
+      cost: 30,
+      tier: "legendary",
+      legendary: true,
+      text: "Treat your current card as any number once."
     }
   };
 
   const SHOP_TIERS = {
-    common: ["burn", "coinPurse", "luckyMatch"],
-    uncommon: ["pardon", "graveGrab", "loadedDraw", "taxCollector"],
-    rare: ["sabotage", "chaosCut", "shield", "wildSeal"],
-    legendary: ["debt"]
+    common: ["burn", "coinPurse", "luckyMatch", "bottomDeal", "insuranceFraud"],
+    uncommon: ["pardon", "graveGrab", "taxCollector", "loadedDraw", "riggedDiscard", "blackMarket", "doubleDown"],
+    rare: ["chaosCut", "mirrorCurse", "shield", "wildSeal", "royalGambit", "debtSwap"],
+    legendary: ["debt", "jokersFavor"]
   };
-  const BOT_SHOP_ITEMS = new Set(["burn", "coinPurse", "luckyMatch", "pardon", "graveGrab", "loadedDraw", "taxCollector", "sabotage", "chaosCut", "shield", "debt"]);
+  const COIN_PURSE_SHOP_CHANCE = 0.25;
+  const BOT_SHOP_ITEMS = new Set([
+    "burn",
+    "coinPurse",
+    "luckyMatch",
+    "bottomDeal",
+    "insuranceFraud",
+    "pardon",
+    "graveGrab",
+    "loadedDraw",
+    "taxCollector",
+    "riggedDiscard",
+    "blackMarket",
+    "doubleDown",
+    "mirrorCurse",
+    "chaosCut",
+    "shield",
+    "debt",
+    "jokersFavor"
+  ]);
   const MUSIC_FOLDER = "assets/audio/music/";
   const AUDIO_FILES = {
     music: "assets/audio/lofi-loop.mp3",
@@ -113,6 +185,19 @@
   const AUTH_STORAGE_KEY = "trashCardsAuth";
   const PERFORMANCE_STORAGE_KEY = "trashCardsPerformanceMode";
   const RELEASE_FALLBACKS = [
+    {
+      name: "v0.2.9 - Crown Debt Item Overhaul",
+      tag_name: "v0.2.9",
+      published_at: "2026-05-21T00:00:00Z",
+      body: [
+        "## Highlights",
+        "- Added Bottom Deal, Insurance Fraud, Rigged Discard, Black Market, Double Down, Mirror Curse, Debt Swap, Royal Gambit, and Joker's Favor.",
+        "- Reworked Lucky Match into a suspense flip instead of guaranteed value.",
+        "- Reworked Wild Seal so face cards can only become slots 1-5.",
+        "- Replaced Sabotage with the fairer Mirror Curse.",
+        "- Tuned Coin Purse to appear in about 25% of shops."
+      ].join("\n")
+    },
     {
       name: "v0.2.8 - Online Rooms Start",
       tag_name: "v0.2.8",
@@ -878,6 +963,8 @@
       pendingPurchase: null,
       shopOffers: [],
       shopLocked: false,
+      roundWinnerSeat: null,
+      matchOver: false,
       recycleCount: 0,
       players: [createPlayer(localPlayer.username || "You"), createPlayer(opponentPlayer.username || "Opponent")]
     };
@@ -911,7 +998,8 @@
       actionType,
       payload: {
         ...payload,
-        actionId
+        actionId,
+        snapshot: payload.snapshot === undefined ? makeOnlineSnapshot() : payload.snapshot
       }
     }));
   }
@@ -925,25 +1013,218 @@
 
     const actorIndex = onlineActorIndex(message.userId);
     if (actorIndex === null || actorIndex === human) return;
+    if (onlineSnapshotIsStale(message.payload.snapshot)) return;
+
+    if (message.actionType === "sync") {
+      applyOnlineSnapshot(message.payload.snapshot, message.userId);
+      return;
+    }
 
     if (message.actionType === "draw") {
       const source = message.payload.source === "discard" ? "discard" : "deck";
       const sourceRect = source === "discard" ? els.discardPile.getBoundingClientRect() : els.deckPile.getBoundingClientRect();
       drawFrom(source, sourceRect, actorIndex, false);
       setStatus(`${state.players[actorIndex].name} drew a card.`);
+      applyOnlineSnapshot(message.payload.snapshot, message.userId);
       return;
     }
 
     if (message.actionType === "place") {
       placeHeld(Number(message.payload.index), currentRect(), actorIndex, false);
       if (!state.over) setStatus(`${state.players[actorIndex].name} is playing.`);
+      applyOnlineSnapshot(message.payload.snapshot, message.userId);
       return;
     }
 
     if (message.actionType === "discard") {
       discardHeld(actorIndex, currentRect(), els.discardPile.getBoundingClientRect());
       finishOnlineTurn(actorIndex);
+      applyOnlineSnapshot(message.payload.snapshot, message.userId);
     }
+  }
+
+  function broadcastOnlineSnapshot(reason = "sync") {
+    if (!state || !state.online) return;
+    sendOnlineAction("sync", {
+      reason,
+      snapshot: makeOnlineSnapshot()
+    });
+  }
+
+  function cloneCard(card) {
+    return card ? {
+      rank: card.rank,
+      suit: card.suit,
+      value: card.value,
+      red: Boolean(card.red)
+    } : null;
+  }
+
+  function cloneCards(cards = []) {
+    return cards.map(cloneCard).filter(Boolean);
+  }
+
+  function serializeSlot(slot) {
+    return {
+      card: cloneCard(slot.card),
+      up: Boolean(slot.up),
+      peeked: Boolean(slot.peeked)
+    };
+  }
+
+  function deserializeSlot(slot) {
+    return {
+      card: cloneCard(slot && slot.card),
+      up: Boolean(slot && slot.up),
+      peeked: Boolean(slot && slot.peeked)
+    };
+  }
+
+  function serializePlayer(player) {
+    return {
+      name: player.name,
+      targetSize: player.targetSize,
+      coins: player.coins,
+      items: [...player.items],
+      slots: player.slots.map(serializeSlot),
+      maxChain: player.maxChain,
+      discardPlace: Boolean(player.discardPlace),
+      faceTrashed: Boolean(player.faceTrashed),
+      itemUsedThisRound: Boolean(player.itemUsedThisRound),
+      insuranceFraud: Boolean(player.insuranceFraud),
+      doubleDown: Boolean(player.doubleDown),
+      nextRoundSize: player.nextRoundSize,
+      seatIndex: player.seatIndex
+    };
+  }
+
+  function deserializePlayer(snapshotPlayer, fallbackPlayer, seatIndex) {
+    const next = createPlayer(snapshotPlayer?.name || fallbackPlayer?.name || (seatIndex === 0 ? "Player 1" : "Player 2"));
+    next.targetSize = clampClientNumber(snapshotPlayer?.targetSize, 1, 10, fallbackPlayer?.targetSize || 10);
+    next.coins = clampClientNumber(snapshotPlayer?.coins, 0, 9999, fallbackPlayer?.coins || 0);
+    next.items = Array.isArray(snapshotPlayer?.items) ? snapshotPlayer.items.filter((itemId) => ITEMS[itemId]).slice(0, 2) : [];
+    next.slots = Array.isArray(snapshotPlayer?.slots) ? snapshotPlayer.slots.map(deserializeSlot) : [];
+    next.maxChain = clampClientNumber(snapshotPlayer?.maxChain, 0, 99, fallbackPlayer?.maxChain || 0);
+    next.discardPlace = Boolean(snapshotPlayer?.discardPlace);
+    next.faceTrashed = Boolean(snapshotPlayer?.faceTrashed);
+    next.itemUsedThisRound = Boolean(snapshotPlayer?.itemUsedThisRound);
+    next.insuranceFraud = Boolean(snapshotPlayer?.insuranceFraud);
+    next.doubleDown = Boolean(snapshotPlayer?.doubleDown);
+    next.nextRoundSize = parseBoardSize(snapshotPlayer?.nextRoundSize);
+    next.seatIndex = seatIndex;
+    return next;
+  }
+
+  function clampClientNumber(value, min, max, fallback) {
+    const number = Number(value);
+    if (!Number.isFinite(number)) return fallback;
+    return Math.max(min, Math.min(max, Math.floor(number)));
+  }
+
+  function parseSeat(value) {
+    if (value === null || value === undefined || value === "") return null;
+    const number = Number(value);
+    if (!Number.isInteger(number) || number < 0 || number > 1) return null;
+    return number;
+  }
+
+  function parseBoardSize(value) {
+    if (value === null || value === undefined || value === "") return null;
+    const number = Number(value);
+    if (!Number.isInteger(number) || number < 1 || number > 10) return null;
+    return number;
+  }
+
+  function onlineSnapshotIsStale(snapshot) {
+    if (!snapshot || !state) return false;
+    const snapshotRound = Number(snapshot.round);
+    return Number.isFinite(snapshotRound) && snapshotRound < (state.round || 1);
+  }
+
+  function makeOnlineSnapshot() {
+    if (!state || !state.online || !state.onlineRoom) return null;
+    return {
+      version: 1,
+      roomCode: state.onlineRoom.code,
+      mode: state.mode,
+      round: state.round,
+      deck: cloneCards(state.deck),
+      discard: cloneCards(state.discard),
+      held: cloneCard(state.held),
+      turnSeat: state.players[state.turn]?.seatIndex ?? 0,
+      phase: state.phase,
+      over: Boolean(state.over),
+      drawSource: state.drawSource,
+      turnPlacements: state.turnPlacements,
+      pendingItem: state.pendingItem,
+      pendingPurchase: state.pendingPurchase,
+      shopOffers: [...state.shopOffers],
+      shopLocked: Boolean(state.shopLocked),
+      roundWinnerSeat: state.roundWinnerSeat,
+      matchOver: Boolean(state.matchOver),
+      recycleCount: state.recycleCount || 0,
+      players: [0, 1].map((seatIndex) => serializePlayer(state.players[playerIndexForSeat(seatIndex)]))
+    };
+  }
+
+  function applyOnlineSnapshot(snapshot, senderUserId = "") {
+    if (!snapshot || !state || !state.online || !state.onlineRoom) return false;
+    if (snapshot.roomCode && snapshot.roomCode !== state.onlineRoom.code) return false;
+
+    const localSeat = state.onlineRoom.localSeat;
+    const opponentSeat = state.onlineRoom.opponentSeat;
+    const currentRoom = state.onlineRoom;
+    const processedActions = currentRoom.processedActions || new Set();
+    const previousPhase = state.phase;
+    const previousRound = state.round;
+    const snapshotRound = clampClientNumber(snapshot.round, 1, 99, state.round || 1);
+    if (snapshotRound < (state.round || 1)) return false;
+
+    state.mode = snapshot.mode || state.mode;
+    state.round = snapshotRound;
+    state.deck = cloneCards(snapshot.deck);
+    state.discard = cloneCards(snapshot.discard);
+    state.held = cloneCard(snapshot.held);
+    state.turn = playerIndexForSeat(clampClientNumber(snapshot.turnSeat, 0, 1, 0));
+    state.phase = typeof snapshot.phase === "string" ? snapshot.phase : state.phase;
+    state.over = Boolean(snapshot.over);
+    state.drawSource = snapshot.drawSource || null;
+    state.turnPlacements = clampClientNumber(snapshot.turnPlacements, 0, 99, 0);
+    state.pendingItem = snapshot.pendingItem || null;
+    state.pendingPurchase = snapshot.pendingPurchase || null;
+    state.shopOffers = Array.isArray(snapshot.shopOffers) ? snapshot.shopOffers.filter((itemId) => ITEMS[itemId]) : [];
+    state.shopLocked = Boolean(snapshot.shopLocked);
+    state.roundWinnerSeat = parseSeat(snapshot.roundWinnerSeat);
+    state.matchOver = Boolean(snapshot.matchOver);
+    state.recycleCount = clampClientNumber(snapshot.recycleCount, 0, 999, state.recycleCount || 0);
+    state.players[human] = deserializePlayer(snapshot.players?.[localSeat], state.players[human], localSeat);
+    state.players[bot] = deserializePlayer(snapshot.players?.[opponentSeat], state.players[bot], opponentSeat);
+    state.onlineRoom = {
+      ...currentRoom,
+      processedActions
+    };
+
+    if (state.phase !== previousPhase || state.round !== previousRound || state.phase === "draw") {
+      hideAllModals();
+    }
+
+    if (state.phase === "over") {
+      setStatus("Round synced. Continue when both players are ready.");
+    } else if (state.turn === human && state.phase === "draw") {
+      setStatus("Your turn. Draw a card, then drag it to a slot or discard.");
+    } else if (state.turn === human && state.phase === "place" && state.held) {
+      afterDraw(human, false);
+    } else if (senderUserId) {
+      setStatus(`${state.players[bot].name} synced the table.`);
+    }
+
+    render();
+    if (state.phase === "over" && endRoundUiIsHidden()) {
+      showSyncedEndRoundUi();
+    } else if (!els.shopModal.classList.contains("hidden")) {
+      renderShop();
+    }
+    return true;
   }
 
   function showLeaderboard() {
@@ -1690,7 +1971,10 @@
       maxChain: 0,
       discardPlace: false,
       faceTrashed: false,
-      itemUsedThisRound: false
+      itemUsedThisRound: false,
+      insuranceFraud: false,
+      doubleDown: false,
+      nextRoundSize: null
     };
   }
 
@@ -1721,6 +2005,8 @@
       pendingPurchase: null,
       shopOffers: [],
       shopLocked: false,
+      roundWinnerSeat: null,
+      matchOver: false,
       players: [createPlayer("You"), createPlayer("Bot")]
     };
     els.modeScreen.classList.add("hidden");
@@ -1733,6 +2019,7 @@
 
   function startRound() {
     const deck = makeDeck(state && state.online ? seededRandom(onlineRoundSeed("deck")) : Math.random);
+    const roundSizes = state.players.map((player) => player.nextRoundSize || player.targetSize);
     state.deck = deck;
     state.discard = [];
     state.held = null;
@@ -1742,6 +2029,8 @@
     state.drawSource = null;
     state.turnPlacements = 0;
     state.pendingItem = null;
+    state.roundWinnerSeat = null;
+    state.matchOver = false;
     state.recycleCount = 0;
     state.players.forEach((player) => {
       player.slots = [];
@@ -1751,12 +2040,15 @@
       player.itemUsedThisRound = false;
     });
     if (state.online) {
-      dealOnlineSlots(deck);
+      dealOnlineSlots(deck, roundSizes);
     } else {
-      state.players.forEach((player) => {
-        player.slots = dealSlots(deck, player.targetSize);
+      state.players.forEach((player, index) => {
+        player.slots = dealSlots(deck, roundSizes[index]);
       });
     }
+    state.players.forEach((player) => {
+      player.nextRoundSize = null;
+    });
     state.discard.push(drawDeckCard());
     hideAllModals();
     setStatus(state.turn === human ? "Draw a card, then drag it to a slot or discard." : `${state.players[bot].name} starts. Waiting for their move.`);
@@ -1813,11 +2105,11 @@
     return state.onlineRoom.localSeat === seatIndex ? human : bot;
   }
 
-  function dealOnlineSlots(deck) {
+  function dealOnlineSlots(deck, roundSizes) {
     const seatSlots = [];
     [0, 1].forEach((seatIndex) => {
       const playerIndex = playerIndexForSeat(seatIndex);
-      seatSlots[seatIndex] = dealSlots(deck, state.players[playerIndex].targetSize);
+      seatSlots[seatIndex] = dealSlots(deck, roundSizes[playerIndex]);
     });
     state.players[human].slots = seatSlots[state.onlineRoom.localSeat];
     state.players[bot].slots = seatSlots[state.onlineRoom.opponentSeat];
@@ -1842,6 +2134,11 @@
   function drawDeckCard() {
     if (state.deck.length === 0) recycleDiscard();
     return state.deck.pop();
+  }
+
+  function drawBottomCard() {
+    if (state.deck.length === 0) recycleDiscard();
+    return state.deck.shift();
   }
 
   function recycleDiscard() {
@@ -1970,10 +2267,10 @@
     state.players[playerIndex].maxChain = Math.max(state.players[playerIndex].maxChain, state.turnPlacements);
 
     if (checkWinner(playerIndex)) {
+      endRound(playerIndex);
       if (broadcast && state.online && playerIndex === human) {
         sendOnlineAction("place", { index });
       }
-      endRound(playerIndex);
       return true;
     }
 
@@ -1998,8 +2295,8 @@
     if (state.over || state.turn !== human || state.phase !== "place" || !state.held) return;
     if (state.online) {
       discardHeld(human, currentRect(), els.discardPile.getBoundingClientRect());
-      sendOnlineAction("discard");
       finishOnlineTurn(human);
+      sendOnlineAction("discard");
       return;
     }
     discardHeld(human, currentRect(), els.discardPile.getBoundingClientRect());
@@ -2041,7 +2338,7 @@
     state.turnPlacements = 0;
     render();
 
-    botMaybeUseSabotage();
+    botMaybeUseMirrorCurse();
     if (state.over) return;
     botMaybeUseLuckyMatch();
     if (state.over) return;
@@ -2052,7 +2349,7 @@
     state.drawSource = useDiscard ? "discard" : "deck";
     if (useDiscard) {
       state.held = state.discard.pop();
-    } else if (!botMaybeUseLoadedDraw()) {
+    } else if (!botMaybeUseLoadedDraw() && !botMaybeUseBottomDeal()) {
       state.held = drawDeckCard();
     }
     const origin = useDiscard ? els.discardPile.getBoundingClientRect() : els.deckPile.getBoundingClientRect();
@@ -2122,6 +2419,7 @@
     if (playerIndex === human) {
       setStatus(`Loaded Draw kept ${cardLabel(keep)}.`);
       afterDraw(human);
+      broadcastOnlineSnapshot("itemLoadedDraw");
     }
     return true;
   }
@@ -2131,6 +2429,13 @@
     const itemIndex = state.players[bot].items.indexOf("loadedDraw");
     if (itemIndex < 0) return false;
     return loadedDraw(bot, itemIndex);
+  }
+
+  function botMaybeUseBottomDeal() {
+    if (!isCrownMode()) return false;
+    const itemIndex = state.players[bot].items.indexOf("bottomDeal");
+    if (itemIndex < 0) return false;
+    return useBottomDeal(bot, itemIndex);
   }
 
   function correctHiddenSlots(playerIndex) {
@@ -2152,33 +2457,227 @@
   }
 
   function useLuckyMatch(playerIndex, itemIndex) {
-    const matches = correctHiddenSlots(playerIndex);
-    if (!matches.length) return false;
-    const { slot, index } = matches[Math.floor(Math.random() * matches.length)];
-    slot.up = true;
-    slot.peeked = false;
+    const targets = hiddenSlots(playerIndex);
+    if (!targets.length) return false;
+    const { slot, index } = targets[Math.floor(Math.random() * targets.length)];
+    const matched = slot.card.value === index + 1;
+    slot.up = matched;
+    slot.peeked = !matched && playerIndex === human;
     consumeItem(playerIndex, itemIndex);
-    if (checkWinner(playerIndex)) {
+    if (matched && checkWinner(playerIndex)) {
       endRound(playerIndex);
+      if (playerIndex === human) broadcastOnlineSnapshot("itemLuckyMatch");
       return true;
     }
-    if (playerIndex === human) setStatus(`Lucky Match flipped slot ${index + 1}.`);
+    if (playerIndex === human) {
+      setStatus(matched ? `Lucky Match hit slot ${index + 1}.` : `Lucky Match missed slot ${index + 1}.`);
+    }
     render();
     bumpElement(cardElement(playerIndex, index));
+    if (playerIndex === human) broadcastOnlineSnapshot("itemLuckyMatch");
+    if (!matched && playerIndex === human) {
+      window.setTimeout(() => {
+        if (!state || state.over || slot.up) return;
+        slot.peeked = false;
+        render();
+        broadcastOnlineSnapshot("itemLuckyMatchReset");
+      }, 900);
+    } else if (!matched) {
+      slot.peeked = false;
+    }
     return true;
   }
 
-  function useSabotage(attackerIndex, targetIndex, itemIndex) {
-    const targets = faceUpSlots(targetIndex);
-    if (!targets.length) return false;
-    const { slot, index } = targets[Math.floor(Math.random() * targets.length)];
-    slot.up = false;
-    slot.peeked = false;
-    consumeItem(attackerIndex, itemIndex);
-    if (attackerIndex === human) setStatus(`Sabotage flipped Bot slot ${index + 1} face-down.`);
+  function useMirrorCurse(playerIndex, itemIndex) {
+    const humanTargets = faceUpSlots(human);
+    const botTargets = faceUpSlots(bot);
+    if (!humanTargets.length || !botTargets.length) return false;
+    const picks = [
+      { playerIndex: human, ...humanTargets[Math.floor(Math.random() * humanTargets.length)] },
+      { playerIndex: bot, ...botTargets[Math.floor(Math.random() * botTargets.length)] }
+    ];
+    picks.forEach(({ slot }) => {
+      slot.up = false;
+      slot.peeked = false;
+    });
+    consumeItem(playerIndex, itemIndex);
+    if (playerIndex === human) setStatus("Mirror Curse flipped one completed slot on each board.");
     render();
-    bumpElement(cardElement(targetIndex, index));
+    picks.forEach(({ playerIndex: owner, index }) => bumpElement(cardElement(owner, index)));
+    if (playerIndex === human) broadcastOnlineSnapshot("itemMirrorCurse");
     return true;
+  }
+
+  function useRiggedDiscard(playerIndex, itemIndex) {
+    if (!state.held) return false;
+    const rigged = state.held;
+    const fresh = drawDeckCard();
+    if (!fresh) return false;
+    state.discard.push(rigged);
+    state.held = fresh;
+    state.drawSource = "deck";
+    consumeItem(playerIndex, itemIndex);
+    if (playerIndex === human) {
+      setStatus(`Rigged Discard traded ${cardLabel(rigged)} for ${cardLabel(fresh)}.`);
+      afterDraw(human);
+      broadcastOnlineSnapshot("itemRiggedDiscard");
+    }
+    return true;
+  }
+
+  function useBottomDeal(playerIndex, itemIndex) {
+    const drawn = drawBottomCard();
+    if (!drawn) return false;
+    state.held = drawn;
+    state.phase = "place";
+    state.drawSource = "deck";
+    state.turnPlacements = 0;
+    consumeItem(playerIndex, itemIndex);
+    if (playerIndex === human) {
+      setStatus(`Bottom Deal drew ${cardLabel(drawn)}.`);
+      afterDraw(human);
+      broadcastOnlineSnapshot("itemBottomDeal");
+    }
+    return true;
+  }
+
+  function useRoyalGambit(playerIndex, itemIndex, guessIndex) {
+    const player = state.players[playerIndex];
+    const slot = player.slots[guessIndex];
+    if (!slot || slot.up) return false;
+    const revealed = drawDeckCard();
+    if (!revealed) return false;
+    consumeItem(playerIndex, itemIndex);
+    if (revealed.value === guessIndex + 1) {
+      const bumped = slot.card;
+      slot.card = revealed;
+      slot.up = true;
+      slot.peeked = false;
+      state.held = bumped;
+      state.phase = "place";
+      state.drawSource = "deck";
+      state.turnPlacements = 1;
+      player.maxChain = Math.max(player.maxChain, state.turnPlacements);
+      if (checkWinner(playerIndex)) {
+        endRound(playerIndex);
+      } else if (playerIndex === human) {
+        setStatus(`Royal Gambit hit slot ${guessIndex + 1}.`);
+      }
+    } else {
+      state.discard.push(revealed);
+      state.held = null;
+      state.phase = "draw";
+      state.drawSource = null;
+      state.turnPlacements = 0;
+      if (playerIndex === human) setStatus(`Royal Gambit missed with ${cardLabel(revealed)}. Draw normally.`);
+    }
+    render();
+    bumpElement(cardElement(playerIndex, guessIndex));
+    if (playerIndex === human) broadcastOnlineSnapshot("itemRoyalGambit");
+    return true;
+  }
+
+  function useBoardSizeSwap(playerIndex, targetIndex, itemIndex) {
+    if (state.players[playerIndex].targetSize - state.players[targetIndex].targetSize < 2) return false;
+    const nextPlayerSize = state.players[targetIndex].targetSize;
+    const nextTargetSize = state.players[playerIndex].targetSize;
+    state.players[playerIndex].nextRoundSize = nextPlayerSize;
+    state.players[targetIndex].nextRoundSize = nextTargetSize;
+    consumeItem(playerIndex, itemIndex);
+    if (playerIndex === human) {
+      els.shopStatus.textContent = `Debt Swap armed. Next round: you play ${nextPlayerSize}, opponent plays ${nextTargetSize}.`;
+    }
+    renderShop();
+    render();
+    if (playerIndex === human) broadcastOnlineSnapshot("shopDebtSwap");
+    return true;
+  }
+
+  function useInsuranceFraud(playerIndex, itemIndex) {
+    const player = state.players[playerIndex];
+    if (player.coins < 1 || player.insuranceFraud) return false;
+    player.coins -= 1;
+    player.insuranceFraud = true;
+    consumeItem(playerIndex, itemIndex);
+    if (playerIndex === human) {
+      els.shopStatus.textContent = "Insurance Fraud armed. Lose next round for +3 bonus coins.";
+    }
+    renderShop();
+    render();
+    if (playerIndex === human) broadcastOnlineSnapshot("shopInsuranceFraud");
+    return true;
+  }
+
+  function useDoubleDown(playerIndex, itemIndex) {
+    const player = state.players[playerIndex];
+    if (player.doubleDown) return false;
+    player.doubleDown = true;
+    consumeItem(playerIndex, itemIndex);
+    if (playerIndex === human) {
+      els.shopStatus.textContent = "Double Down armed. Win next round for +5 coins, lose for no payout.";
+    }
+    renderShop();
+    render();
+    if (playerIndex === human) broadcastOnlineSnapshot("shopDoubleDown");
+    return true;
+  }
+
+  function useBlackMarket(playerIndex, itemIndex) {
+    consumeItem(playerIndex, itemIndex);
+    state.shopOffers = generateShopOffers({ blackMarket: true }).filter((itemId) => itemId !== "blackMarket");
+    const fallbackPool = [...SHOP_TIERS.uncommon, ...SHOP_TIERS.rare, ...(state.round >= 3 ? SHOP_TIERS.legendary : [])]
+      .filter((itemId) => itemId !== "blackMarket");
+    while (state.shopOffers.length < 3) addShopOffer(state.shopOffers, fallbackPool);
+    if (playerIndex === human) {
+      els.shopStatus.textContent = "Black Market refreshed the shop with hotter odds.";
+    }
+    renderShop();
+    render();
+    if (playerIndex === human) broadcastOnlineSnapshot("shopBlackMarket");
+    return true;
+  }
+
+  function placeFlexibleHeld(index, itemIndex, label, syncReason) {
+    if (state.over || state.turn !== human || state.phase !== "place" || !state.held || state.players[human].slots[index].up) return false;
+    const sourceRect = currentRect();
+    const targetRect = cardRect(human, index);
+    const placed = state.held;
+    const slot = state.players[human].slots[index];
+    const bumped = slot.card;
+    slot.card = placed;
+    slot.up = true;
+    slot.peeked = false;
+    state.held = bumped;
+    state.turnPlacements += 1;
+    state.players[human].maxChain = Math.max(state.players[human].maxChain, state.turnPlacements);
+    consumeItem(human, itemIndex);
+
+    if (checkWinner(human)) {
+      endRound(human);
+      broadcastOnlineSnapshot(syncReason);
+      return true;
+    }
+
+    if (isPlayable(state.held, human)) {
+      setStatus(`${label} landed. Keep going with ${cardLabel(state.held)}.`);
+    } else {
+      setStatus(`${label} landed. ${cardLabel(state.held)} is trash.`);
+    }
+    render();
+    animateCard(placed, sourceRect, targetRect, "place");
+    bumpElement(els.currentCard);
+    playSfx("place");
+    broadcastOnlineSnapshot(syncReason);
+    return true;
+  }
+
+  function useJokersFavor(index, itemIndex) {
+    return placeFlexibleHeld(index, itemIndex, "Joker's Favor", "itemJokersFavor");
+  }
+
+  function useWildSealSlot(index, itemIndex) {
+    if (!state.held || state.held.value <= 10 || index > 4) return false;
+    return placeFlexibleHeld(index, itemIndex, "Wild Seal", "itemWildSeal");
   }
 
   function useChaosCut(playerIndex, itemIndex) {
@@ -2192,6 +2691,7 @@
     consumeItem(playerIndex, itemIndex);
     if (playerIndex === human) setStatus("Chaos Cut shuffled every face-down card on both boards.");
     render();
+    if (playerIndex === human) broadcastOnlineSnapshot("itemChaosCut");
     return true;
   }
 
@@ -2207,6 +2707,7 @@
     }
     renderShop();
     render();
+    if (attackerIndex === human) broadcastOnlineSnapshot("shopTaxCollector");
     return true;
   }
 
@@ -2217,13 +2718,13 @@
     return useLuckyMatch(bot, itemIndex);
   }
 
-  function botMaybeUseSabotage() {
+  function botMaybeUseMirrorCurse() {
     if (!isCrownMode()) return false;
-    const itemIndex = state.players[bot].items.indexOf("sabotage");
+    const itemIndex = state.players[bot].items.indexOf("mirrorCurse");
     const botUp = faceUpSlots(bot).length;
     const humanUp = faceUpSlots(human).length;
-    if (itemIndex < 0 || humanUp < 2 || humanUp <= botUp) return false;
-    return useSabotage(bot, human, itemIndex);
+    if (itemIndex < 0 || humanUp < 2 || botUp < 1 || humanUp <= botUp) return false;
+    return useMirrorCurse(bot, itemIndex);
   }
 
   function botMaybeUseChaosCut() {
@@ -2237,8 +2738,10 @@
 
   function botMaybeRedraw() {
     if (!isCrownMode() || !state.held) return false;
+    const riggedIndex = state.players[bot].items.indexOf("riggedDiscard");
     const pardonIndex = state.players[bot].items.indexOf("pardon");
     const graveIndex = state.players[bot].items.indexOf("graveGrab");
+    if (riggedIndex >= 0 && useRiggedDiscard(bot, riggedIndex)) return true;
     if (graveIndex >= 0 && state.discard.length && !isPlayable(state.held, bot) && isPlayable(state.discard[state.discard.length - 1], bot)) {
       const grabbed = state.discard.pop();
       state.discard.push(state.held);
@@ -2267,6 +2770,8 @@
     const winnerName = winner === human ? "You" : state.players[winner].name;
     const winnerWasBehind = state.players[winner].targetSize > state.players[loser].targetSize;
     const matchWon = state.players[winner].targetSize === 1;
+    state.roundWinnerSeat = state.players[winner].seatIndex ?? winner;
+    state.matchOver = matchWon;
     const rewards = isCrownMode() ? awardCoins(winner, winnerWasBehind) : [];
 
     render();
@@ -2291,12 +2796,84 @@
       if (state.players[winner].items.length >= 2) {
         if (winner === human) {
           showForcedDiscard();
+        } else if (state.online) {
+          showShop(`${winnerName} won while holding two items. Waiting for ${winnerName} to discard one.`, {
+            generate: false,
+            reset: false
+          });
         } else {
           const removed = botDiscardWeakestItem();
           showShop(`${state.players[bot].name} discarded ${ITEMS[removed].name} after winning with two items.`);
         }
       } else {
         showShop(summary);
+      }
+      return;
+    }
+
+    showRoundModal(
+      `${winnerName} won the round.`,
+      summary,
+      [],
+      "Next round",
+      continueToNextRound
+    );
+  }
+
+  function endRoundUiIsHidden() {
+    return els.roundModal.classList.contains("hidden")
+      && els.shopModal.classList.contains("hidden")
+      && els.discardModal.classList.contains("hidden");
+  }
+
+  function roundWinnerIndex() {
+    if (!state || !state.players) return null;
+    if (state.roundWinnerSeat !== null && state.roundWinnerSeat !== undefined) {
+      return playerIndexForSeat(state.roundWinnerSeat);
+    }
+    const index = state.players.findIndex((player) => player.slots.length && player.slots.every((slot) => slot.up));
+    return index >= 0 ? index : null;
+  }
+
+  function isWaitingForRemoteDiscard() {
+    if (!state || !state.online || !isCrownMode() || state.phase !== "over" || state.matchOver) return false;
+    if (state.roundWinnerSeat !== state.onlineRoom?.opponentSeat) return false;
+    return state.players[bot].items.length >= 2;
+  }
+
+  function showSyncedEndRoundUi() {
+    const winner = roundWinnerIndex();
+    if (winner === null) return;
+    const winnerName = winner === human ? "You" : state.players[winner].name;
+    const summary = state.matchOver
+      ? `${winnerName} cleared the final 1-card board.`
+      : `${winnerName} won the round. ${winner === human ? "Your" : `${winnerName}'s`} next board is ${state.players[winner].targetSize} cards.`;
+
+    if (state.matchOver) {
+      showRoundModal(
+        `${winnerName} won the match.`,
+        summary,
+        [],
+        "Choose mode",
+        () => showModeSelect(),
+        "victory"
+      );
+      return;
+    }
+
+    if (isCrownMode()) {
+      if (winner === human && state.players[human].items.length >= 2) {
+        showForcedDiscard();
+      } else if (isWaitingForRemoteDiscard()) {
+        showShop(`${winnerName} won while holding two items. Waiting for ${winnerName} to discard one.`, {
+          generate: false,
+          reset: false
+        });
+      } else {
+        showShop(summary, {
+          generate: state.shopOffers.length === 0,
+          reset: false
+        });
       }
       return;
     }
@@ -2335,6 +2912,24 @@
         coins += 1;
         parts.push("+1 no item used");
       }
+      if (player.doubleDown) {
+        if (index === winner) {
+          coins += 5;
+          parts.push("+5 double down");
+        } else {
+          coins = 0;
+          parts.length = 0;
+          parts.push("double down lost");
+        }
+        player.doubleDown = false;
+      }
+      if (player.insuranceFraud) {
+        if (index !== winner) {
+          coins += 3;
+          parts.push("+3 insurance");
+        }
+        player.insuranceFraud = false;
+      }
       player.coins += coins;
       showCoinPop(index, coins, "round");
       lines.push(`${player.name}: +${coins} coins (${parts.join(", ")})`);
@@ -2363,16 +2958,21 @@
       const card = itemCard(itemId, `Discard ${ITEMS[itemId].name}`, () => {
         state.players[human].items.splice(index, 1);
         showShop("You discarded an item after winning with two.");
+        broadcastOnlineSnapshot("forcedItemDiscard");
       });
       return card;
     }));
     els.discardModal.classList.remove("hidden");
   }
 
-  function showShop(message) {
-    if (!state.shopOffers.length) state.shopOffers = generateShopOffers();
-    state.shopLocked = false;
-    state.pendingPurchase = null;
+  function showShop(message, options = {}) {
+    const generate = options.generate !== false;
+    const reset = options.reset !== false;
+    if (generate && !state.shopOffers.length) state.shopOffers = generateShopOffers();
+    if (reset) {
+      state.shopLocked = false;
+      state.pendingPurchase = null;
+    }
     hideAllModals();
     els.shopModal.classList.remove("hidden");
     els.shopStatus.textContent = message || "Buy, replace, claim, use Debt of the Crown, or skip ahead.";
@@ -2381,19 +2981,34 @@
     playSfx("shop");
   }
 
-  function generateShopOffers() {
+  function generateShopOffers(options = {}) {
     const offers = [];
-    addShopOffer(offers, SHOP_TIERS.common);
-    addShopOffer(offers, SHOP_TIERS.common);
+    const commonPool = SHOP_TIERS.common.filter((itemId) => itemId !== "coinPurse");
+    const coinPurseRoll = Math.random() < COIN_PURSE_SHOP_CHANCE;
+    addShopOffer(offers, commonPool);
+    if (!options.blackMarket) addShopOffer(offers, commonPool);
+    if (coinPurseRoll) {
+      const commonIndexes = offers
+        .map((itemId, index) => (commonPool.includes(itemId) ? index : -1))
+        .filter((index) => index >= 0);
+      const replaceIndex = commonIndexes[Math.floor(Math.random() * commonIndexes.length)];
+      if (replaceIndex !== undefined) offers[replaceIndex] = "coinPurse";
+    }
 
-    const legendaryRoll = state.round >= 3 && Math.random() < 0.08;
+    const legendaryRoll = state.round >= 3 && Math.random() < (options.blackMarket ? 0.16 : 0.08);
     if (legendaryRoll) {
       addShopOffer(offers, SHOP_TIERS.legendary);
     } else {
-      addShopOffer(offers, Math.random() < 0.35 ? SHOP_TIERS.rare : SHOP_TIERS.uncommon);
+      addShopOffer(offers, Math.random() < (options.blackMarket ? 0.65 : 0.35) ? SHOP_TIERS.rare : SHOP_TIERS.uncommon);
     }
 
-    const fallbackPool = [...SHOP_TIERS.common, ...SHOP_TIERS.uncommon, ...SHOP_TIERS.rare];
+    if (options.blackMarket) {
+      addShopOffer(offers, Math.random() < 0.65 ? SHOP_TIERS.rare : SHOP_TIERS.uncommon);
+    }
+
+    const fallbackPool = options.blackMarket
+      ? [...SHOP_TIERS.uncommon, ...SHOP_TIERS.rare, ...(state.round >= 3 ? SHOP_TIERS.legendary : [])]
+      : [...commonPool, ...SHOP_TIERS.uncommon, ...SHOP_TIERS.rare];
     while (offers.length < 3) addShopOffer(offers, fallbackPool);
     return offers;
   }
@@ -2406,8 +3021,11 @@
 
   function renderShop() {
     const player = state.players[human];
+    const waitingForRemoteDiscard = isWaitingForRemoteDiscard();
     els.coinText.textContent = `Coins: ${player.coins}`;
     els.roundText.textContent = `Round ${state.round}`;
+    els.nextRound.disabled = waitingForRemoteDiscard;
+    els.nextRound.textContent = waitingForRemoteDiscard ? "Waiting..." : "Next round";
 
     const inventoryNodes = player.items.length
       ? player.items.map((itemId, index) => shopInventoryCard(itemId, index))
@@ -2419,10 +3037,12 @@
 
   function shopInventoryCard(itemId, index) {
     const actions = [];
+    const locked = isWaitingForRemoteDiscard();
     if (state.pendingPurchase) {
       actions.push({
         text: `Replace with ${ITEMS[state.pendingPurchase].name}`,
         primary: true,
+        disabled: locked,
         handler: () => replaceItem(index)
       });
     }
@@ -2430,7 +3050,7 @@
       actions.push({
         text: "Use",
         primary: true,
-        disabled: state.players[bot].targetSize >= 10,
+        disabled: locked || state.players[bot].targetSize >= 10,
         handler: () => useDebt(index)
       });
     }
@@ -2438,7 +3058,7 @@
       actions.push({
         text: "Use",
         primary: true,
-        disabled: !canUseShopItem(itemId, human),
+        disabled: locked || !canUseShopItem(itemId, human),
         handler: () => useShopItem(itemId, index, human, bot)
       });
     }
@@ -2454,13 +3074,35 @@
   function canUseShopItem(itemId, playerIndex) {
     const targetIndex = playerIndex === human ? bot : human;
     if (itemId === "taxCollector") return state.players[targetIndex].coins > 0;
+    if (itemId === "insuranceFraud") return state.players[playerIndex].coins > 0 && !state.players[playerIndex].insuranceFraud;
+    if (itemId === "blackMarket") return state.shopOffers.length > 0;
+    if (itemId === "doubleDown") return !state.players[playerIndex].doubleDown;
+    if (itemId === "debtSwap") return state.players[playerIndex].targetSize - state.players[targetIndex].targetSize >= 2;
     return false;
   }
 
   function useShopItem(itemId, itemIndex, playerIndex, targetIndex) {
+    if (isWaitingForRemoteDiscard()) {
+      els.shopStatus.textContent = `Waiting for ${state.players[bot].name} to discard an item.`;
+      return;
+    }
     if (itemId === "taxCollector") {
       if (!useTaxCollector(playerIndex, targetIndex, itemIndex) && playerIndex === human) {
         els.shopStatus.textContent = "Bot has no coins to steal.";
+      }
+    } else if (itemId === "insuranceFraud") {
+      if (!useInsuranceFraud(playerIndex, itemIndex) && playerIndex === human) {
+        els.shopStatus.textContent = "Insurance Fraud needs 1 coin and cannot stack.";
+      }
+    } else if (itemId === "blackMarket") {
+      useBlackMarket(playerIndex, itemIndex);
+    } else if (itemId === "doubleDown") {
+      if (!useDoubleDown(playerIndex, itemIndex) && playerIndex === human) {
+        els.shopStatus.textContent = "Double Down is already armed.";
+      }
+    } else if (itemId === "debtSwap") {
+      if (!useBoardSizeSwap(playerIndex, targetIndex, itemIndex) && playerIndex === human) {
+        els.shopStatus.textContent = "Debt Swap only works when you are behind by 2 or more cards.";
       }
     }
   }
@@ -2469,11 +3111,12 @@
     const item = ITEMS[itemId];
     const canAfford = state.players[human].coins >= item.cost;
     const full = state.players[human].items.length >= 2 && !item.immediate;
+    const locked = isWaitingForRemoteDiscard();
     const actionText = itemId === "coinPurse" ? "Claim +3" : full ? "Replace..." : `Buy for ${item.cost}`;
     return itemCard(itemId, [{
       text: actionText,
       primary: true,
-      disabled: !canAfford || state.shopLocked,
+      disabled: locked || !canAfford || state.shopLocked,
       handler: () => buyOffer(itemId)
     }]);
   }
@@ -2544,6 +3187,10 @@
   function buyOffer(itemId) {
     const player = state.players[human];
     const item = ITEMS[itemId];
+    if (isWaitingForRemoteDiscard()) {
+      els.shopStatus.textContent = `Waiting for ${state.players[bot].name} to discard an item.`;
+      return;
+    }
     if (state.shopLocked) {
       els.shopStatus.textContent = "Coin Purse already paid out. Start the next round when ready.";
       return;
@@ -2561,6 +3208,7 @@
       renderShop();
       render();
       showCoinPop(human, 3, "purse");
+      broadcastOnlineSnapshot("shopCoinPurse");
       return;
     }
     if (player.items.length >= 2) {
@@ -2575,12 +3223,17 @@
     els.shopStatus.textContent = `Bought ${item.name}.`;
     renderShop();
     render();
+    broadcastOnlineSnapshot("shopBuy");
   }
 
   function replaceItem(index) {
     const itemId = state.pendingPurchase;
     const item = ITEMS[itemId];
     const player = state.players[human];
+    if (isWaitingForRemoteDiscard()) {
+      els.shopStatus.textContent = `Waiting for ${state.players[bot].name} to discard an item.`;
+      return;
+    }
     if (!itemId || player.coins < item.cost) return;
     const old = player.items[index];
     player.coins -= item.cost;
@@ -2590,6 +3243,7 @@
     els.shopStatus.textContent = `Replaced ${ITEMS[old].name} with ${item.name}.`;
     renderShop();
     render();
+    broadcastOnlineSnapshot("shopReplace");
   }
 
   function consumeNamedItem(playerIndex, itemId) {
@@ -2612,6 +3266,10 @@
   }
 
   function useDebt(index) {
+    if (isWaitingForRemoteDiscard()) {
+      els.shopStatus.textContent = `Waiting for ${state.players[bot].name} to discard an item.`;
+      return;
+    }
     const result = applyDebt(human, bot);
     if (result === "max") {
       els.shopStatus.textContent = "Bot is already back at 10 cards.";
@@ -2623,6 +3281,7 @@
       : `Debt of the Crown hit. Bot now needs ${state.players[bot].targetSize}.`;
     renderShop();
     render();
+    broadcastOnlineSnapshot("shopDebt");
   }
 
   function botDiscardWeakestItem() {
@@ -2646,11 +3305,24 @@
     if (taxIndex >= 0 && state.players[human].coins > 0) {
       useTaxCollector(bot, human, taxIndex);
     }
+    const swapIndex = botPlayer.items.indexOf("debtSwap");
+    if (swapIndex >= 0 && botPlayer.targetSize - state.players[human].targetSize >= 2) {
+      useBoardSizeSwap(bot, human, swapIndex);
+    }
+    const doubleIndex = botPlayer.items.indexOf("doubleDown");
+    if (doubleIndex >= 0 && !botPlayer.doubleDown && botPlayer.targetSize <= state.players[human].targetSize) {
+      useDoubleDown(bot, doubleIndex);
+    }
+    const insuranceIndex = botPlayer.items.indexOf("insuranceFraud");
+    if (insuranceIndex >= 0 && botPlayer.coins > 0 && !botPlayer.insuranceFraud && botPlayer.targetSize > state.players[human].targetSize) {
+      useInsuranceFraud(bot, insuranceIndex);
+    }
 
     const offers = generateShopOffers()
       .filter((itemId) => BOT_SHOP_ITEMS.has(itemId))
       .filter((itemId) => botPlayer.coins >= ITEMS[itemId].cost)
       .filter((itemId) => itemId !== "debt" || state.players[human].targetSize < 10)
+      .filter((itemId) => itemId !== "debtSwap" || botPlayer.targetSize - state.players[human].targetSize >= 2)
       .filter((itemId) => itemId !== "coinPurse" || botPlayer.items.length >= 2)
       .sort((a, b) => ITEMS[b].cost - ITEMS[a].cost);
     if (botPlayer.items.length >= 2 && offers.includes("coinPurse")) {
@@ -2669,6 +3341,7 @@
     state.shopLocked = false;
     state.pendingPurchase = null;
     startRound();
+    if (state.online) broadcastOnlineSnapshot("nextRound");
   }
 
   function hideAllModals() {
@@ -2823,16 +3496,26 @@
       consumeItem(human, index);
       setStatus("Burned the discard pile. Choose your draw.");
       render();
+      broadcastOnlineSnapshot("itemBurn");
       return;
     }
 
     if (itemId === "luckyMatch") {
-      if (!useLuckyMatch(human, index)) setStatus("Lucky Match needs a hidden card already in the right slot.");
+      if (!useLuckyMatch(human, index)) setStatus("Lucky Match needs at least one hidden card.");
       return;
     }
 
-    if (itemId === "sabotage") {
-      if (!useSabotage(human, bot, index)) setStatus("Sabotage needs Bot to have at least one placed card.");
+    if (itemId === "bottomDeal") {
+      if (state.phase !== "draw") {
+        setStatus("Bottom Deal can be used before you draw.");
+        return;
+      }
+      if (!useBottomDeal(human, index)) setStatus("The deck is empty.");
+      return;
+    }
+
+    if (itemId === "mirrorCurse") {
+      if (!useMirrorCurse(human, index)) setStatus("Mirror Curse needs both players to have a completed slot.");
       return;
     }
 
@@ -2855,6 +3538,7 @@
       state.drawSource = "deck";
       consumeItem(human, index);
       afterDraw(human);
+      broadcastOnlineSnapshot("itemPardon");
       return;
     }
 
@@ -2869,6 +3553,16 @@
       state.drawSource = "discard";
       consumeItem(human, index);
       afterDraw(human);
+      broadcastOnlineSnapshot("itemGraveGrab");
+      return;
+    }
+
+    if (itemId === "riggedDiscard") {
+      if (state.phase !== "place" || !state.held) {
+        setStatus("Rigged Discard needs a current card.");
+        return;
+      }
+      if (!useRiggedDiscard(human, index)) setStatus("The deck is empty.");
       return;
     }
 
@@ -2887,7 +3581,29 @@
         return;
       }
       state.pendingItem = { type: "wildSeal", index };
-      setStatus("Tap any empty slot for the sealed face card.");
+      setStatus("Tap an empty slot 1-5 for the sealed face card.");
+      render();
+      return;
+    }
+
+    if (itemId === "royalGambit") {
+      if (state.phase !== "draw") {
+        setStatus("Royal Gambit can be used before you draw.");
+        return;
+      }
+      state.pendingItem = { type: "royalGambit", index };
+      setStatus("Tap a hidden slot to guess that number.");
+      render();
+      return;
+    }
+
+    if (itemId === "jokersFavor") {
+      if (state.phase !== "place" || !state.held) {
+        setStatus("Joker's Favor needs a current card.");
+        return;
+      }
+      state.pendingItem = { type: "jokersFavor", index };
+      setStatus("Tap any empty slot for Joker's Favor.");
       render();
       return;
     }
@@ -2904,6 +3620,26 @@
 
     if (itemId === "taxCollector") {
       setStatus("Use Tax Collector in the shop between rounds.");
+      return;
+    }
+
+    if (itemId === "insuranceFraud") {
+      setStatus("Use Insurance Fraud in the shop between rounds.");
+      return;
+    }
+
+    if (itemId === "blackMarket") {
+      setStatus("Use Black Market in the shop between rounds.");
+      return;
+    }
+
+    if (itemId === "doubleDown") {
+      setStatus("Use Double Down in the shop between rounds.");
+      return;
+    }
+
+    if (itemId === "debtSwap") {
+      setStatus("Use Debt Swap in the shop between rounds.");
     }
   }
 
@@ -2916,40 +3652,29 @@
     if (!slot || slot.up) return true;
 
     if (pending.type === "wildSeal") {
-      if (!state.held || state.held.value <= 10) return true;
-      placeWildSeal(index, pending.index);
+      if (!useWildSealSlot(index, pending.index)) setStatus("Wild Seal can only use empty slots 1-5.");
+      return true;
+    }
+
+    if (pending.type === "royalGambit") {
+      useRoyalGambit(human, pending.index, index);
+      return true;
+    }
+
+    if (pending.type === "jokersFavor") {
+      useJokersFavor(index, pending.index);
       return true;
     }
 
     return false;
   }
 
-  function placeWildSeal(index, itemIndex) {
-    if (state.over || state.turn !== human || state.phase !== "place" || !state.held || state.players[human].slots[index].up) return;
-    const sourceRect = currentRect();
-    const targetRect = cardRect(human, index);
-    const placed = state.held;
-    const slot = state.players[human].slots[index];
-    const bumped = slot.card;
-    slot.card = placed;
-    slot.up = true;
-    slot.peeked = false;
-    state.held = bumped;
-    state.turnPlacements += 1;
-    state.players[human].maxChain = Math.max(state.players[human].maxChain, state.turnPlacements);
-    consumeItem(human, itemIndex);
-
-    if (checkWinner(human)) return endRound(human);
-
-    if (isPlayable(state.held, human)) {
-      setStatus(`Wild Seal landed. Keep going with ${cardLabel(state.held)}.`);
-    } else {
-      setStatus(`Wild Seal landed. ${cardLabel(state.held)} is trash.`);
-    }
-    render();
-    animateCard(placed, sourceRect, targetRect, "place");
-    bumpElement(els.currentCard);
-    playSfx("place");
+  function canUsePendingItemOnSlot(index, slot) {
+    if (!state.pendingItem || !slot || slot.up) return false;
+    if (state.pendingItem.type === "wildSeal") return index < 5;
+    if (state.pendingItem.type === "royalGambit") return state.phase === "draw";
+    if (state.pendingItem.type === "jokersFavor") return state.phase === "place";
+    return false;
   }
 
   function consumeItem(playerIndex, index) {
@@ -2961,7 +3686,7 @@
   function renderCard(slot, index, owner) {
     const button = document.createElement("button");
     const humanCanAct = owner === human && state.turn === human && !state.over && state.phase !== "waiting";
-    const itemSelectable = humanCanAct && state.pendingItem && !slot.up;
+    const itemSelectable = humanCanAct && canUsePendingItemOnSlot(index, slot);
     const playable = humanCanAct && canPlaceHeldFor(human, index);
     const visible = slot.up || slot.peeked;
     button.className = `card ${visible ? "face-up" : "face-down"}${playable ? " target" : ""}${itemSelectable ? " item-selectable" : ""}`;
@@ -3419,6 +4144,10 @@
     if (modalAction) modalAction();
   });
   els.nextRound.addEventListener("click", () => {
+    if (isWaitingForRemoteDiscard()) {
+      els.shopStatus.textContent = `Waiting for ${state.players[bot].name} to discard an item.`;
+      return;
+    }
     if (!state.online) botShop();
     state.pendingPurchase = null;
     state.shopOffers = [];
