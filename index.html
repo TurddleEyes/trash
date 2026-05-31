@@ -131,6 +131,7 @@
 
           <section class="center-play">
             <div id="turnPill" class="turn-pill">Your turn</div>
+            <div id="timerPill" class="timer-pill" hidden>30s</div>
             <p id="statusText" class="table-status">Draw a card, then drag it to a slot or discard.</p>
             <div class="piles-row">
               <button id="deckPile" class="pile deck-pile" type="button" data-drag-source="deck">
@@ -375,6 +376,7 @@
         <div class="shop-meta">
           <span id="coinText">Coins: 0</span>
           <span id="roundText">Round 1</span>
+          <span id="shopTimerText" class="shop-timer-text">Waiting for choices</span>
         </div>
         <h3>Your items</h3>
         <div id="shopInventory" class="item-grid"></div>
@@ -385,6 +387,6 @@
     </div>
 
     <script src="assets/audio/music/playlist.js"></script>
-    <script src="game.js?v=v0.2.9-items-1"></script>
+    <script src="game.js?v=v0.2.10-online-timers-1"></script>
   </body>
 </html>

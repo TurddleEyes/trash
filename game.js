@@ -184,7 +184,23 @@
   const PUBLIC_API_BASE = "https://trash-cards-api.chaseshaffer07.workers.dev";
   const AUTH_STORAGE_KEY = "trashCardsAuth";
   const PERFORMANCE_STORAGE_KEY = "trashCardsPerformanceMode";
+  const ONLINE_TURN_MS = 30000;
+  const ONLINE_SHOP_MS = 45000;
+  const ONLINE_TIMEOUT_LIMIT = 2;
+  const ONLINE_TIMEOUT_PENALTY_PERCENT = 5;
   const RELEASE_FALLBACKS = [
+    {
+      name: "v0.2.10 - Multiplayer Timers",
+      tag_name: "v0.2.10",
+      published_at: "2026-05-31T00:00:00Z",
+      body: [
+        "## Highlights",
+        "- Added shared online Crown Debt shops so both players choose from the same offers.",
+        "- Online shops now wait until both players are ready or their shop timers expire.",
+        "- Added online turn timers that reset after draw, place, discard, and item actions.",
+        "- Added timeout match endings with 5% point penalties for repeated inactivity."
+      ].join("\n")
+    },
     {
       name: "v0.2.9 - Crown Debt Item Overhaul",
       tag_name: "v0.2.9",
@@ -376,6 +392,7 @@
     botTurnText: document.getElementById("botTurnText"),
     humanTurnText: document.getElementById("humanTurnText"),
     turnPill: document.getElementById("turnPill"),
+    timerPill: document.getElementById("timerPill"),
     deckPile: document.getElementById("deckPile"),
     discardPile: document.getElementById("discardPile"),
     deckCount: document.getElementById("deckCount"),
@@ -395,6 +412,7 @@
     shopStatus: document.getElementById("shopStatus"),
     coinText: document.getElementById("coinText"),
     roundText: document.getElementById("roundText"),
+    shopTimerText: document.getElementById("shopTimerText"),
     shopInventory: document.getElementById("shopInventory"),
     shopOffers: document.getElementById("shopOffers"),
     nextRound: document.getElementById("nextRound")
@@ -433,6 +451,7 @@
   };
   let roomSocket = null;
   let onlineActionCounter = 0;
+  let onlineTimerInterval = null;
   const audioState = {
     musicEnabled: false,
     sfxEnabled: false,
@@ -759,6 +778,7 @@
   }
 
   function closeRoomSocket(clearRoom = true) {
+    stopOnlineTimerLoop();
     if (roomSocket) {
       roomSocket.onopen = null;
       roomSocket.onmessage = null;
@@ -963,6 +983,14 @@
       pendingPurchase: null,
       shopOffers: [],
       shopLocked: false,
+      shopReadySeats: [],
+      shopDeadlineBySeat: [0, 0],
+      timeoutMissesBySeat: [0, 0],
+      timeoutChain: [],
+      timeoutPenaltySeats: [],
+      turnDeadlineAt: 0,
+      turnTimerStartedAt: 0,
+      matchEndReason: "",
       roundWinnerSeat: null,
       matchOver: false,
       recycleCount: 0,
@@ -979,6 +1007,7 @@
     setAppHeight();
     hideAllModals();
     playMusic();
+    startOnlineTimerLoop();
     startRound();
   }
 
@@ -987,6 +1016,279 @@
     if (userId === state.onlineRoom.localUserId) return human;
     if (userId === state.onlineRoom.opponentUserId) return bot;
     return null;
+  }
+
+  function onlineSeatForPlayer(playerIndex) {
+    return state?.players?.[playerIndex]?.seatIndex ?? playerIndex;
+  }
+
+  function onlinePlayerForSeat(seat) {
+    return state?.players?.[playerIndexForSeat(seat)] || null;
+  }
+
+  function isOnlineCoordinator() {
+    return Boolean(state && state.online && state.onlineRoom && state.onlineRoom.localSeat === 0);
+  }
+
+  function startOnlineTimerLoop() {
+    if (onlineTimerInterval) return;
+    onlineTimerInterval = window.setInterval(tickOnlineTimers, 250);
+  }
+
+  function stopOnlineTimerLoop() {
+    if (!onlineTimerInterval) return;
+    window.clearInterval(onlineTimerInterval);
+    onlineTimerInterval = null;
+  }
+
+  function markOnlineActivity(playerIndex, options = {}) {
+    if (!state || !state.online || state.matchOver) return;
+    const seat = onlineSeatForPlayer(playerIndex);
+    state.timeoutChain = [];
+
+    if (options.shop) {
+      ensureOnlineShopTimers(false);
+      state.shopDeadlineBySeat[seat] = Date.now() + ONLINE_SHOP_MS;
+      return;
+    }
+
+    if (state.players[state.turn]?.seatIndex === seat && !state.over) {
+      startOnlineTurnTimer(playerIndex);
+    }
+  }
+
+  function startOnlineTurnTimer(playerIndex = state?.turn) {
+    if (!state || !state.online || state.over || state.matchOver) return;
+    state.turnTimerStartedAt = Date.now();
+    state.turnDeadlineAt = state.turnTimerStartedAt + ONLINE_TURN_MS;
+  }
+
+  function clearOnlineTurnTimer() {
+    if (!state) return;
+    state.turnDeadlineAt = 0;
+    state.turnTimerStartedAt = 0;
+  }
+
+  function ensureOnlineShopTimers(reset = false) {
+    if (!state || !state.online || !isCrownMode() || state.matchOver) return;
+    if (!Array.isArray(state.shopReadySeats)) state.shopReadySeats = [];
+    if (!Array.isArray(state.shopDeadlineBySeat)) state.shopDeadlineBySeat = [0, 0];
+    const now = Date.now();
+    [0, 1].forEach((seat) => {
+      if (reset || !state.shopDeadlineBySeat[seat]) {
+        state.shopDeadlineBySeat[seat] = now + ONLINE_SHOP_MS;
+      }
+    });
+  }
+
+  function resetOnlineShopFlow() {
+    if (!state || !state.online) return;
+    state.shopReadySeats = [];
+    state.shopDeadlineBySeat = [0, 0];
+  }
+
+  function markShopReady(seat, ready = true) {
+    if (!state || !state.online) return;
+    const current = parseSeatList(state.shopReadySeats);
+    state.shopReadySeats = ready
+      ? parseSeatList([...current, seat])
+      : current.filter((entry) => entry !== seat);
+  }
+
+  function localShopReady() {
+    return Boolean(state && state.online && parseSeatList(state.shopReadySeats).includes(state.onlineRoom.localSeat));
+  }
+
+  function bothShopReady() {
+    return Boolean(state && parseSeatList(state.shopReadySeats).length >= 2);
+  }
+
+  function handleOnlineShopReadyClick() {
+    if (!state || !state.online || !isCrownMode() || state.matchOver || state.phase !== "over") {
+      continueToNextRound();
+      return;
+    }
+    const seat = state.onlineRoom.localSeat;
+    markShopReady(seat, true);
+    state.shopDeadlineBySeat[seat] = 0;
+    els.shopStatus.textContent = "Ready. Waiting for the other player.";
+    renderShop();
+    renderTimerUi();
+    sendOnlineAction("shopReady", { seat });
+    maybeAdvanceOnlineShop("ready");
+  }
+
+  function maybeAdvanceOnlineShop(reason = "ready") {
+    if (!state || !state.online || state.matchOver || state.phase !== "over") return;
+    if (!bothShopReady()) return;
+    if (!isOnlineCoordinator()) {
+      setStatus("Both players are ready. Waiting for the room host to start the next round.");
+      return;
+    }
+    state.shopReadySeats = [0, 1];
+    state.shopDeadlineBySeat = [0, 0];
+    continueToNextRound(reason);
+  }
+
+  function tickOnlineTimers() {
+    renderTimerUi();
+    if (!state || !state.online || state.matchOver || !isOnlineCoordinator()) return;
+
+    const now = Date.now();
+    if (!state.over && state.turnDeadlineAt && now >= state.turnDeadlineAt) {
+      handleOnlineTurnTimeout();
+      return;
+    }
+
+    if (state.phase === "over" && isCrownMode()) {
+      handleOnlineShopTimeouts(now);
+    }
+  }
+
+  function handleOnlineTurnTimeout() {
+    if (!state || !state.online || state.matchOver) return;
+    const timedOutPlayer = state.turn;
+    const timedOutSeat = onlineSeatForPlayer(timedOutPlayer);
+    noteOnlineTimeout(timedOutSeat);
+
+    if (shouldEndForTimeouts()) {
+      endOnlineTimeoutMatch(timeoutPenaltySeatsForEnd(), "turn-timeout");
+      return;
+    }
+
+    if (state.phase === "place" && state.held) {
+      state.discard.push(state.held);
+      state.held = null;
+      state.drawSource = null;
+    }
+
+    const nextSeat = timedOutSeat === 0 ? 1 : 0;
+    state.turn = playerIndexForSeat(nextSeat);
+    state.phase = "draw";
+    state.turnPlacements = 0;
+    state.drawSource = null;
+    startOnlineTurnTimer(state.turn);
+    setStatus(`${onlinePlayerForSeat(timedOutSeat)?.name || "Player"} timed out. Turn skipped.`);
+    render();
+    broadcastOnlineSnapshot("turnTimeout");
+  }
+
+  function handleOnlineShopTimeouts(now = Date.now()) {
+    if (!state || !state.online || state.matchOver || state.phase !== "over") return;
+    ensureOnlineShopTimers(false);
+    const readySeats = parseSeatList(state.shopReadySeats);
+    [0, 1].forEach((seat) => {
+      if (readySeats.includes(seat)) return;
+      const deadline = state.shopDeadlineBySeat[seat] || 0;
+      if (!deadline || now < deadline) return;
+      const playerIndex = playerIndexForSeat(seat);
+      if (state.roundWinnerSeat === seat && state.players[playerIndex]?.items?.length >= 2) {
+        discardWeakestItem(playerIndex);
+      }
+      noteOnlineTimeout(seat);
+      markShopReady(seat, true);
+      state.shopDeadlineBySeat[seat] = 0;
+    });
+
+    if (shouldEndForTimeouts()) {
+      endOnlineTimeoutMatch(timeoutPenaltySeatsForEnd(), "shop-timeout");
+      return;
+    }
+
+    if (bothShopReady()) {
+      maybeAdvanceOnlineShop("shopTimeout");
+    } else {
+      broadcastOnlineSnapshot("shopTimeout");
+    }
+  }
+
+  function noteOnlineTimeout(seat) {
+    if (!state) return;
+    state.timeoutMissesBySeat = parseSeatCounters(state.timeoutMissesBySeat);
+    state.timeoutMissesBySeat[seat] += 1;
+    const chain = Array.isArray(state.timeoutChain) ? state.timeoutChain : [];
+    state.timeoutChain = [...chain, seat].slice(-2);
+  }
+
+  function shouldEndForTimeouts() {
+    if (!state) return false;
+    const misses = parseSeatCounters(state.timeoutMissesBySeat);
+    if (misses.some((count) => count >= ONLINE_TIMEOUT_LIMIT)) return true;
+    const chain = parseSeatList(state.timeoutChain);
+    return chain.length >= 2 && chain.includes(0) && chain.includes(1);
+  }
+
+  function timeoutPenaltySeatsForEnd() {
+    if (!state) return [];
+    const misses = parseSeatCounters(state.timeoutMissesBySeat);
+    const overLimit = [0, 1].filter((seat) => misses[seat] >= ONLINE_TIMEOUT_LIMIT);
+    if (overLimit.length) return overLimit;
+    const chain = parseSeatList(state.timeoutChain);
+    return chain.length >= 2 && chain.includes(0) && chain.includes(1) ? [0, 1] : [];
+  }
+
+  function endOnlineTimeoutMatch(penaltySeats, reason = "timeout") {
+    if (!state || !state.online || state.matchOver) return;
+    const seats = parseSeatList(penaltySeats);
+    state.matchOver = true;
+    state.over = true;
+    state.phase = "over";
+    state.held = null;
+    state.drawSource = null;
+    state.timeoutPenaltySeats = seats;
+    state.matchEndReason = reason;
+    clearOnlineTurnTimer();
+    state.shopDeadlineBySeat = [0, 0];
+    state.shopReadySeats = [0, 1];
+    render();
+    showTimeoutModal(seats);
+    sendOnlineAction("timeoutPenalty", {
+      penaltyUserIds: seats
+        .map((seat) => state.onlineRoom.players?.[seat]?.userId)
+        .filter(Boolean),
+      penaltySeats: seats,
+      mode: isCrownMode() ? "crown" : "classic",
+      reason,
+      percent: ONLINE_TIMEOUT_PENALTY_PERCENT
+    });
+  }
+
+  function showTimeoutModal(penaltySeats = []) {
+    const names = parseSeatList(penaltySeats)
+      .map((seat) => onlinePlayerForSeat(seat)?.name || `Player ${seat + 1}`)
+      .join(" and ");
+    const localPenalized = state?.onlineRoom && penaltySeats.includes(state.onlineRoom.localSeat);
+    showRoundModal(
+      "Match ended by inactivity.",
+      names
+        ? `${names} lost 5% of their saved points for repeated inactivity.`
+        : "The room ended because players stopped making moves.",
+      [],
+      "Choose mode",
+      () => showModeSelect()
+    );
+    if (localPenalized) window.setTimeout(() => refreshAuthProfile(true), 1500);
+  }
+
+  function renderTimerUi() {
+    if (!els.timerPill) return;
+    if (!state || !state.online || state.matchOver || state.phase === "over") {
+      els.timerPill.hidden = true;
+    } else {
+      const seconds = Math.max(0, Math.ceil(((state.turnDeadlineAt || 0) - Date.now()) / 1000));
+      els.timerPill.hidden = !state.turnDeadlineAt;
+      els.timerPill.textContent = `${seconds}s`;
+      els.timerPill.classList.toggle("warning", seconds <= 10 && seconds > 5);
+      els.timerPill.classList.toggle("danger", seconds <= 5);
+    }
+
+    if (els.shopTimerText && state && state.online && state.phase === "over" && isCrownMode()) {
+      const seat = state.onlineRoom.localSeat;
+      const ready = localShopReady();
+      const deadline = state.shopDeadlineBySeat?.[seat] || 0;
+      const seconds = Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
+      els.shopTimerText.textContent = ready ? "You are ready" : `Shop timer: ${seconds}s`;
+    }
   }
 
   function sendOnlineAction(actionType, payload = {}) {
@@ -1040,7 +1342,16 @@
       discardHeld(actorIndex, currentRect(), els.discardPile.getBoundingClientRect());
       finishOnlineTurn(actorIndex);
       applyOnlineSnapshot(message.payload.snapshot, message.userId);
+      return;
     }
+
+    if (message.actionType === "shopReady" || message.actionType === "timeoutPenalty") {
+      applyOnlineSnapshot(message.payload.snapshot, message.userId);
+      if (message.actionType === "shopReady") maybeAdvanceOnlineShop("remoteReady");
+      return;
+    }
+
+    applyOnlineSnapshot(message.payload.snapshot, message.userId);
   }
 
   function broadcastOnlineSnapshot(reason = "sync") {
@@ -1135,6 +1446,21 @@
     return number;
   }
 
+  function parseSeatList(value) {
+    if (!Array.isArray(value)) return [];
+    return [...new Set(value.map(parseSeat).filter((seat) => seat !== null))];
+  }
+
+  function parseSeatCounters(value) {
+    if (!Array.isArray(value)) return [0, 0];
+    return [0, 1].map((seat) => clampClientNumber(value[seat], 0, 99, 0));
+  }
+
+  function parseSeatDeadlines(value) {
+    if (!Array.isArray(value)) return [0, 0];
+    return [0, 1].map((seat) => clampClientNumber(value[seat], 0, Number.MAX_SAFE_INTEGER, 0));
+  }
+
   function onlineSnapshotIsStale(snapshot) {
     if (!snapshot || !state) return false;
     const snapshotRound = Number(snapshot.round);
@@ -1160,6 +1486,14 @@
       pendingPurchase: state.pendingPurchase,
       shopOffers: [...state.shopOffers],
       shopLocked: Boolean(state.shopLocked),
+      shopReadySeats: parseSeatList(state.shopReadySeats),
+      shopDeadlineBySeat: parseSeatDeadlines(state.shopDeadlineBySeat),
+      timeoutMissesBySeat: parseSeatCounters(state.timeoutMissesBySeat),
+      timeoutChain: parseSeatList(state.timeoutChain),
+      timeoutPenaltySeats: parseSeatList(state.timeoutPenaltySeats),
+      turnDeadlineAt: clampClientNumber(state.turnDeadlineAt, 0, Number.MAX_SAFE_INTEGER, 0),
+      turnTimerStartedAt: clampClientNumber(state.turnTimerStartedAt, 0, Number.MAX_SAFE_INTEGER, 0),
+      matchEndReason: state.matchEndReason || "",
       roundWinnerSeat: state.roundWinnerSeat,
       matchOver: Boolean(state.matchOver),
       recycleCount: state.recycleCount || 0,
@@ -1194,6 +1528,14 @@
     state.pendingPurchase = snapshot.pendingPurchase || null;
     state.shopOffers = Array.isArray(snapshot.shopOffers) ? snapshot.shopOffers.filter((itemId) => ITEMS[itemId]) : [];
     state.shopLocked = Boolean(snapshot.shopLocked);
+    state.shopReadySeats = parseSeatList(snapshot.shopReadySeats);
+    state.shopDeadlineBySeat = parseSeatDeadlines(snapshot.shopDeadlineBySeat);
+    state.timeoutMissesBySeat = parseSeatCounters(snapshot.timeoutMissesBySeat);
+    state.timeoutChain = parseSeatList(snapshot.timeoutChain);
+    state.timeoutPenaltySeats = parseSeatList(snapshot.timeoutPenaltySeats);
+    state.turnDeadlineAt = clampClientNumber(snapshot.turnDeadlineAt, 0, Number.MAX_SAFE_INTEGER, 0);
+    state.turnTimerStartedAt = clampClientNumber(snapshot.turnTimerStartedAt, 0, Number.MAX_SAFE_INTEGER, 0);
+    state.matchEndReason = snapshot.matchEndReason || "";
     state.roundWinnerSeat = parseSeat(snapshot.roundWinnerSeat);
     state.matchOver = Boolean(snapshot.matchOver);
     state.recycleCount = clampClientNumber(snapshot.recycleCount, 0, 999, state.recycleCount || 0);
@@ -1219,7 +1561,9 @@
     }
 
     render();
-    if (state.phase === "over" && endRoundUiIsHidden()) {
+    if (state.matchOver && state.matchEndReason && state.matchEndReason.includes("timeout")) {
+      showTimeoutModal(state.timeoutPenaltySeats);
+    } else if (state.phase === "over" && endRoundUiIsHidden()) {
       showSyncedEndRoundUi();
     } else if (!els.shopModal.classList.contains("hidden")) {
       renderShop();
@@ -2005,6 +2349,14 @@
       pendingPurchase: null,
       shopOffers: [],
       shopLocked: false,
+      shopReadySeats: [],
+      shopDeadlineBySeat: [0, 0],
+      timeoutMissesBySeat: [0, 0],
+      timeoutChain: [],
+      timeoutPenaltySeats: [],
+      turnDeadlineAt: 0,
+      turnTimerStartedAt: 0,
+      matchEndReason: "",
       roundWinnerSeat: null,
       matchOver: false,
       players: [createPlayer("You"), createPlayer("Bot")]
@@ -2029,8 +2381,11 @@
     state.drawSource = null;
     state.turnPlacements = 0;
     state.pendingItem = null;
+    if (state.online) resetOnlineShopFlow();
     state.roundWinnerSeat = null;
     state.matchOver = false;
+    state.matchEndReason = "";
+    state.timeoutPenaltySeats = [];
     state.recycleCount = 0;
     state.players.forEach((player) => {
       player.slots = [];
@@ -2050,6 +2405,7 @@
       player.nextRoundSize = null;
     });
     state.discard.push(drawDeckCard());
+    if (state.online) startOnlineTurnTimer(state.turn);
     hideAllModals();
     setStatus(state.turn === human ? "Draw a card, then drag it to a slot or discard." : `${state.players[bot].name} starts. Waiting for their move.`);
     render();
@@ -2225,6 +2581,7 @@
     state.phase = "place";
     state.drawSource = source;
     state.turnPlacements = 0;
+    markOnlineActivity(playerIndex);
     afterDraw(playerIndex, false);
     render();
     animateCard(drawn, sourceRect, currentRect(), "draw");
@@ -2265,6 +2622,7 @@
     }
     state.turnPlacements += 1;
     state.players[playerIndex].maxChain = Math.max(state.players[playerIndex].maxChain, state.turnPlacements);
+    markOnlineActivity(playerIndex);
 
     if (checkWinner(playerIndex)) {
       endRound(playerIndex);
@@ -2325,6 +2683,7 @@
     state.phase = "draw";
     state.drawSource = null;
     state.turnPlacements = 0;
+    startOnlineTurnTimer(next);
     setStatus(next === human
       ? "Your turn. Draw a card, then drag it to a slot or discard."
       : `${state.players[bot].name}'s turn. Waiting for their move.`);
@@ -2766,6 +3125,7 @@
     state.over = true;
     state.phase = "over";
     state.held = null;
+    if (state.online) clearOnlineTurnTimer();
     const loser = winner === human ? bot : human;
     const winnerName = winner === human ? "You" : state.players[winner].name;
     const winnerWasBehind = state.players[winner].targetSize > state.players[loser].targetSize;
@@ -2953,10 +3313,12 @@
   }
 
   function showForcedDiscard() {
+    if (state.online) ensureOnlineShopTimers(false);
     hideAllModals();
     els.discardChoices.replaceChildren(...state.players[human].items.map((itemId, index) => {
       const card = itemCard(itemId, `Discard ${ITEMS[itemId].name}`, () => {
         state.players[human].items.splice(index, 1);
+        markOnlineActivity(human, { shop: true });
         showShop("You discarded an item after winning with two.");
         broadcastOnlineSnapshot("forcedItemDiscard");
       });
@@ -2972,7 +3334,12 @@
     if (reset) {
       state.shopLocked = false;
       state.pendingPurchase = null;
+      if (state.online) {
+        state.shopReadySeats = [];
+        state.shopDeadlineBySeat = [0, 0];
+      }
     }
+    if (state.online) ensureOnlineShopTimers(reset);
     hideAllModals();
     els.shopModal.classList.remove("hidden");
     els.shopStatus.textContent = message || "Buy, replace, claim, use Debt of the Crown, or skip ahead.";
@@ -3022,10 +3389,20 @@
   function renderShop() {
     const player = state.players[human];
     const waitingForRemoteDiscard = isWaitingForRemoteDiscard();
+    const ready = localShopReady();
+    const onlineShop = Boolean(state.online && isCrownMode());
     els.coinText.textContent = `Coins: ${player.coins}`;
     els.roundText.textContent = `Round ${state.round}`;
-    els.nextRound.disabled = waitingForRemoteDiscard;
-    els.nextRound.textContent = waitingForRemoteDiscard ? "Waiting..." : "Next round";
+    els.nextRound.disabled = waitingForRemoteDiscard || ready;
+    els.nextRound.textContent = waitingForRemoteDiscard
+      ? "Waiting..."
+      : onlineShop
+        ? ready ? "Ready..." : "Ready for next round"
+        : "Next round";
+    if (els.shopTimerText) {
+      els.shopTimerText.hidden = !onlineShop;
+    }
+    renderTimerUi();
 
     const inventoryNodes = player.items.length
       ? player.items.map((itemId, index) => shopInventoryCard(itemId, index))
@@ -3037,7 +3414,7 @@
 
   function shopInventoryCard(itemId, index) {
     const actions = [];
-    const locked = isWaitingForRemoteDiscard();
+    const locked = isWaitingForRemoteDiscard() || localShopReady();
     if (state.pendingPurchase) {
       actions.push({
         text: `Replace with ${ITEMS[state.pendingPurchase].name}`,
@@ -3082,6 +3459,10 @@
   }
 
   function useShopItem(itemId, itemIndex, playerIndex, targetIndex) {
+    if (playerIndex === human && localShopReady()) {
+      els.shopStatus.textContent = "You are ready. Waiting for the other player.";
+      return;
+    }
     if (isWaitingForRemoteDiscard()) {
       els.shopStatus.textContent = `Waiting for ${state.players[bot].name} to discard an item.`;
       return;
@@ -3111,7 +3492,7 @@
     const item = ITEMS[itemId];
     const canAfford = state.players[human].coins >= item.cost;
     const full = state.players[human].items.length >= 2 && !item.immediate;
-    const locked = isWaitingForRemoteDiscard();
+    const locked = isWaitingForRemoteDiscard() || localShopReady();
     const actionText = itemId === "coinPurse" ? "Claim +3" : full ? "Replace..." : `Buy for ${item.cost}`;
     return itemCard(itemId, [{
       text: actionText,
@@ -3187,6 +3568,10 @@
   function buyOffer(itemId) {
     const player = state.players[human];
     const item = ITEMS[itemId];
+    if (localShopReady()) {
+      els.shopStatus.textContent = "You are ready. Waiting for the other player.";
+      return;
+    }
     if (isWaitingForRemoteDiscard()) {
       els.shopStatus.textContent = `Waiting for ${state.players[bot].name} to discard an item.`;
       return;
@@ -3204,6 +3589,7 @@
       state.shopLocked = true;
       state.pendingPurchase = null;
       state.shopOffers = state.shopOffers.filter((offer) => offer !== itemId);
+      markOnlineActivity(human, { shop: true });
       els.shopStatus.textContent = "Claimed Coin Purse for +3 coins. The shop is closed for buying.";
       renderShop();
       render();
@@ -3213,6 +3599,7 @@
     }
     if (player.items.length >= 2) {
       state.pendingPurchase = itemId;
+      markOnlineActivity(human, { shop: true });
       els.shopStatus.textContent = `Choose an item to replace with ${item.name}.`;
       renderShop();
       return;
@@ -3220,6 +3607,7 @@
     player.coins -= item.cost;
     player.items.push(itemId);
     state.shopOffers = state.shopOffers.filter((offer) => offer !== itemId);
+    markOnlineActivity(human, { shop: true });
     els.shopStatus.textContent = `Bought ${item.name}.`;
     renderShop();
     render();
@@ -3230,6 +3618,10 @@
     const itemId = state.pendingPurchase;
     const item = ITEMS[itemId];
     const player = state.players[human];
+    if (localShopReady()) {
+      els.shopStatus.textContent = "You are ready. Waiting for the other player.";
+      return;
+    }
     if (isWaitingForRemoteDiscard()) {
       els.shopStatus.textContent = `Waiting for ${state.players[bot].name} to discard an item.`;
       return;
@@ -3240,6 +3632,7 @@
     player.items[index] = itemId;
     state.shopOffers = state.shopOffers.filter((offer) => offer !== itemId);
     state.pendingPurchase = null;
+    markOnlineActivity(human, { shop: true });
     els.shopStatus.textContent = `Replaced ${ITEMS[old].name} with ${item.name}.`;
     renderShop();
     render();
@@ -3266,6 +3659,10 @@
   }
 
   function useDebt(index) {
+    if (localShopReady()) {
+      els.shopStatus.textContent = "You are ready. Waiting for the other player.";
+      return;
+    }
     if (isWaitingForRemoteDiscard()) {
       els.shopStatus.textContent = `Waiting for ${state.players[bot].name} to discard an item.`;
       return;
@@ -3276,6 +3673,7 @@
       return;
     }
     state.players[human].items.splice(index, 1);
+    markOnlineActivity(human, { shop: true });
     els.shopStatus.textContent = result === "blocked"
       ? "Debt of the Crown was blocked by Bot's Crown Shield."
       : `Debt of the Crown hit. Bot now needs ${state.players[bot].targetSize}.`;
@@ -3285,7 +3683,12 @@
   }
 
   function botDiscardWeakestItem() {
-    const items = state.players[bot].items;
+    return discardWeakestItem(bot);
+  }
+
+  function discardWeakestItem(playerIndex) {
+    const items = state.players[playerIndex].items;
+    if (!items.length) return null;
     let weakestIndex = 0;
     items.forEach((itemId, index) => {
       if (ITEMS[itemId].cost < ITEMS[items[weakestIndex]].cost) weakestIndex = index;
@@ -3335,13 +3738,14 @@
     }
   }
 
-  function continueToNextRound() {
+  function continueToNextRound(reason = "nextRound") {
     state.round += 1;
     state.shopOffers = [];
     state.shopLocked = false;
     state.pendingPurchase = null;
+    if (state.online) resetOnlineShopFlow();
     startRound();
-    if (state.online) broadcastOnlineSnapshot("nextRound");
+    if (state.online) broadcastOnlineSnapshot(reason);
   }
 
   function hideAllModals() {
@@ -3681,6 +4085,7 @@
     state.players[playerIndex].items.splice(index, 1);
     state.players[playerIndex].itemUsedThisRound = true;
     state.pendingItem = null;
+    markOnlineActivity(playerIndex, { shop: state.phase === "over" });
   }
 
   function renderCard(slot, index, owner) {
@@ -4049,6 +4454,7 @@
     els.deckPile.disabled = !canDrawFromDeck;
     els.discardPile.disabled = !(canDrawFromDiscard || canDropDiscard);
     renderInventoryBar();
+    renderTimerUi();
   }
 
   function renderGrid(grid, playerIndex) {
@@ -4146,6 +4552,10 @@
   els.nextRound.addEventListener("click", () => {
     if (isWaitingForRemoteDiscard()) {
       els.shopStatus.textContent = `Waiting for ${state.players[bot].name} to discard an item.`;
+      return;
+    }
+    if (state.online) {
+      handleOnlineShopReadyClick();
       return;
     }
     if (!state.online) botShop();

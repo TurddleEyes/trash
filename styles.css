@@ -1363,6 +1363,30 @@ button {
     0 10px 24px rgba(0, 0, 0, 0.24);
 }
 
+.timer-pill {
+  justify-self: center;
+  min-width: 84px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(237, 189, 88, 0.42);
+  background: rgba(7, 18, 18, 0.72);
+  color: var(--ink);
+  text-align: center;
+  font-size: 0.76rem;
+  font-weight: 950;
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.18);
+}
+
+.timer-pill.warning {
+  color: #ffe6a6;
+  border-color: rgba(237, 189, 88, 0.75);
+}
+
+.timer-pill.danger {
+  color: #ffd0d0;
+  border-color: rgba(190, 47, 62, 0.75);
+}
+
 .piles-row {
   justify-content: center;
 }
@@ -2186,6 +2210,10 @@ button {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+.shop-timer-text {
+  border-color: rgba(237, 189, 88, 0.3) !important;
 }
 
 .item-grid {
